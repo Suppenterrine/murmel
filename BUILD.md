@@ -122,6 +122,80 @@ bun run tauri build
 
 This compiles a release binary and generates platform-specific bundles (deb, rpm, AppImage on Linux; dmg on macOS; msi on Windows).
 
+### Disk space
+
+Building Murmel is not cheap on disk. A full debug tree costs ~2.5 GB, a full
+release tree ~4.5 GB — and `tauri build` creates the second one _next to_ the
+first, so a machine that alternates between `tauri dev` and `tauri build` carries
+~7 GB. The bulk is not Rust but the native `transcribe-cpp`/ggml build, which
+compiles many CPU variants plus the Vulkan backend.
+
+Two consequences worth planning for:
+
+- **Keep the build tree off a cramped system drive.** Point `CARGO_TARGET_DIR` at
+  a roomy volume (see the path-limit section below — a short path helps on
+  Windows for a second reason):
+
+  ```powershell
+  [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', 'D:\rust-target', 'User')
+  ```
+
+- **`cargo clean` does not distinguish profiles.** To reclaim only the release
+  tree after pulling the installer out of `bundle/`, use
+  `cargo clean --release`. Copy the installer somewhere else first — it lives
+  inside the tree you are about to delete.
+
+## Releasing
+
+Installed copies of Murmel update themselves. The app checks on startup (the
+setting `update_checks_enabled` defaults to on) and offers a manual check in the
+footer; it downloads the new version, verifies its signature and installs it.
+Nobody needs to fetch an installer by hand, and re-running an old installer only
+reinstalls the old version.
+
+Cutting a release means running the **Release** workflow
+(`.github/workflows/release.yml`, `workflow_dispatch`). Two steps around it are
+easy to miss, and both fail _silently_ — the app simply never sees an update:
+
+1. **Bump the version first.** The workflow reads it out of
+   `src-tauri/tauri.conf.json` and derives the git tag `v<version>` from it. If
+   it still says the shipped version, the release collides with the existing
+   tag. There is no script for this; keep the three files in step by hand:
+
+   ```
+   src-tauri/tauri.conf.json    ← the one the workflow reads
+   src-tauri/Cargo.toml         ← also update Cargo.lock (cargo check)
+   package.json
+   ```
+
+2. **Publish the draft.** The workflow deliberately creates a **draft** release
+   so the artifacts can be checked before anyone gets them. The updater asks
+   `releases/latest/download/latest.json`, and GitHub does not count drafts as
+   "latest". Until the draft is published, every installation keeps reporting
+   "up to date".
+
+### The signing key is what makes updates work at all
+
+`plugins.updater.pubkey` in `tauri.conf.json` is baked into every build. An
+installed copy only accepts updates signed by the matching private key (the
+GitHub secret `TAURI_SIGNING_PRIVATE_KEY`).
+
+The consequence is easy to overlook: **changing the key orphans every copy built
+before the change.** Those installations reject the new signature and stay where
+they are, with no useful error. Murmel switched from the upstream key to its own
+in `0d0c6e7`, _after_ the 0.10.0 release commit — so a 0.10.0 built from an
+earlier commit cannot update itself and has to be replaced with a fresh
+installer once.
+
+To check which key an installed build carries:
+
+```powershell
+$pub = (Get-Content src-tauri\tauri.conf.json -Raw | ConvertFrom-Json).plugins.updater.pubkey
+$exe = "$env:LOCALAPPDATA\Murmel\murmel.exe"
+$text = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($exe))
+$text.Contains($pub.Substring(0, 80))   # True = this build accepts current releases
+```
+
 ## Linux Install (from source)
 
 The raw binary (`src-tauri/target/release/murmel`) cannot run standalone — it needs Tauri resource files (tray icons, sounds, VAD model) to be co-located at the expected path.

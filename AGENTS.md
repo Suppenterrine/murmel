@@ -29,6 +29,26 @@ bun run build      # Build frontend (TypeScript + Vite)
 bun run preview    # Preview built frontend
 ```
 
+**Disk space — do not trigger builds casually.** A debug tree costs ~2.5 GB and a
+release tree ~4.5 GB, and `tauri build` creates the release tree _in addition to_
+the debug one. This has filled the maintainer's system drive before. Rules:
+
+- Never run `bun run tauri build` to "check whether it compiles" — use
+  `cargo check` (in `src-tauri/`), which writes far less.
+- After a release build, copy the installer out of `bundle/` and run
+  `cargo clean --release`.
+- The build tree belongs on a roomy volume via `CARGO_TARGET_DIR`; see
+  [BUILD.md](BUILD.md#disk-space). Do not hardcode that path into
+  `.cargo/config.toml` — that file is also read by the Linux CI.
+- **Set it explicitly in every build command you run.** A tool session inherits
+  the environment of the process that started it, so a persisted user variable
+  is invisible to you and cargo silently falls back to `src-tauri\target` on the
+  system drive:
+
+  ```powershell
+  $env:CARGO_TARGET_DIR = "D:\rust-target"; cargo check
+  ```
+
 **Linting and Formatting (run before committing):**
 
 ```bash
