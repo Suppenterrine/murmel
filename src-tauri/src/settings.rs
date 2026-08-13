@@ -632,6 +632,17 @@ fn default_post_process_provider_id() -> String {
 /// machine — see Murmel_Northstar.md §5.2.
 pub const OLLAMA_PROVIDER_ID: &str = "ollama";
 
+/// The one remote provider Murmel offers.
+///
+/// The fork arrived with eight (OpenAI, Anthropic, Groq, Cerebras, Z.AI,
+/// Bedrock, …). They were dropped rather than carried along: each is a
+/// dropdown entry that has to keep working, and none earns its place next to
+/// OpenRouter, which reaches all of those models through one account. It is
+/// also the only one whose catalogue is public — model list *and prices*
+/// without an API key — which is what lets Murmel show what a dictation
+/// actually costs instead of an abstract rate.
+pub const OPENROUTER_PROVIDER_ID: &str = "openrouter";
+
 fn default_post_process_providers() -> Vec<PostProcessProvider> {
     let mut providers = vec![
         // First in the list because it is the default, and because the list
@@ -649,49 +660,9 @@ fn default_post_process_providers() -> Vec<PostProcessProvider> {
             supports_structured_output: true,
         },
         PostProcessProvider {
-            id: "openai".to_string(),
-            label: "OpenAI".to_string(),
-            base_url: "https://api.openai.com/v1".to_string(),
-            allow_base_url_edit: false,
-            models_endpoint: Some("/models".to_string()),
-            supports_structured_output: true,
-        },
-        PostProcessProvider {
-            id: "zai".to_string(),
-            label: "Z.AI".to_string(),
-            base_url: "https://api.z.ai/api/paas/v4".to_string(),
-            allow_base_url_edit: false,
-            models_endpoint: Some("/models".to_string()),
-            supports_structured_output: true,
-        },
-        PostProcessProvider {
-            id: "openrouter".to_string(),
+            id: OPENROUTER_PROVIDER_ID.to_string(),
             label: "OpenRouter".to_string(),
             base_url: "https://openrouter.ai/api/v1".to_string(),
-            allow_base_url_edit: false,
-            models_endpoint: Some("/models".to_string()),
-            supports_structured_output: true,
-        },
-        PostProcessProvider {
-            id: "anthropic".to_string(),
-            label: "Anthropic".to_string(),
-            base_url: "https://api.anthropic.com/v1".to_string(),
-            allow_base_url_edit: false,
-            models_endpoint: Some("/models".to_string()),
-            supports_structured_output: false,
-        },
-        PostProcessProvider {
-            id: "groq".to_string(),
-            label: "Groq".to_string(),
-            base_url: "https://api.groq.com/openai/v1".to_string(),
-            allow_base_url_edit: false,
-            models_endpoint: Some("/models".to_string()),
-            supports_structured_output: false,
-        },
-        PostProcessProvider {
-            id: "cerebras".to_string(),
-            label: "Cerebras".to_string(),
-            base_url: "https://api.cerebras.ai/v1".to_string(),
             allow_base_url_edit: false,
             models_endpoint: Some("/models".to_string()),
             supports_structured_output: true,
@@ -714,17 +685,9 @@ fn default_post_process_providers() -> Vec<PostProcessProvider> {
         });
     }
 
-    // AWS Bedrock via Mantle (OpenAI-compatible endpoint)
-    providers.push(PostProcessProvider {
-        id: "bedrock_mantle".to_string(),
-        label: "AWS Bedrock (Mantle)".to_string(),
-        base_url: "https://bedrock-mantle.us-east-1.api.aws/v1".to_string(),
-        allow_base_url_edit: false,
-        models_endpoint: Some("/models".to_string()),
-        supports_structured_output: true,
-    });
-
-    // Custom provider always comes last
+    // Custom provider always comes last. Kept for anything speaking the
+    // OpenAI protocol that is neither of the two above — LM Studio, llama.cpp's
+    // server, an Ollama on another machine.
     providers.push(PostProcessProvider {
         id: "custom".to_string(),
         label: "Custom".to_string(),
@@ -906,6 +869,41 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
                 changed = true;
             }
         }
+    }
+
+    // Providers dropped in a later version have to disappear from existing
+    // installations too, or they linger in the dropdown forever.
+    //
+    // One exception: an entry the user actually configured a key for is left
+    // alone. Removing a provider from Murmel's list is a curation decision;
+    // throwing away someone's credentials silently is not.
+    let known: Vec<String> = default_post_process_providers()
+        .into_iter()
+        .map(|provider| provider.id)
+        .collect();
+
+    settings.post_process_providers.retain(|provider| {
+        let keep = known.contains(&provider.id)
+            || settings
+                .post_process_api_keys
+                .get(&provider.id)
+                .is_some_and(|key| !key.trim().is_empty());
+
+        if !keep {
+            debug!("Removing retired post-process provider '{}'", provider.id);
+            changed = true;
+        }
+        keep
+    });
+
+    // The active provider may have just been one of them.
+    if !settings
+        .post_process_providers
+        .iter()
+        .any(|provider| provider.id == settings.post_process_provider_id)
+    {
+        settings.post_process_provider_id = default_post_process_provider_id();
+        changed = true;
     }
 
     // Presets added in later versions have to reach existing installations too,
@@ -1330,6 +1328,59 @@ mod tests {
 
         assert_eq!(provider.id, OLLAMA_PROVIDER_ID);
         assert!(is_local_endpoint(&provider.base_url));
+    }
+
+    /// Retired providers must disappear from existing installations — but not
+    /// one the user configured a key for.
+    #[test]
+    fn retired_providers_are_removed_unless_configured() {
+        let mut settings = get_default_settings();
+
+        settings.post_process_providers.push(PostProcessProvider {
+            id: "groq".to_string(),
+            label: "Groq".to_string(),
+            base_url: "https://api.groq.com/openai/v1".to_string(),
+            allow_base_url_edit: false,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: false,
+        });
+        settings.post_process_providers.push(PostProcessProvider {
+            id: "anthropic".to_string(),
+            label: "Anthropic".to_string(),
+            base_url: "https://api.anthropic.com/v1".to_string(),
+            allow_base_url_edit: false,
+            models_endpoint: Some("/models".to_string()),
+            supports_structured_output: false,
+        });
+        settings
+            .post_process_api_keys
+            .insert("anthropic".to_string(), "sk-ant-configured".to_string());
+
+        ensure_post_process_defaults(&mut settings);
+
+        let ids: Vec<&str> = settings
+            .post_process_providers
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect();
+
+        assert!(!ids.contains(&"groq"), "unconfigured provider should go");
+        assert!(
+            ids.contains(&"anthropic"),
+            "a provider holding the user's API key must not vanish silently"
+        );
+    }
+
+    /// Losing the active provider must not leave the setting pointing at
+    /// something that no longer exists.
+    #[test]
+    fn active_provider_falls_back_when_retired() {
+        let mut settings = get_default_settings();
+        settings.post_process_provider_id = "cerebras".to_string();
+
+        ensure_post_process_defaults(&mut settings);
+
+        assert_eq!(settings.post_process_provider_id, OLLAMA_PROVIDER_ID);
     }
 
     /// Presets added later must reach existing installations exactly once —
