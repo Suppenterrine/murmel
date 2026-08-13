@@ -336,10 +336,7 @@ pub fn update_tray_menu(app: &AppHandle, locale: Option<&str>) {
 }
 
 fn last_transcript_text(entry: &HistoryEntry) -> &str {
-    entry
-        .post_processed_text
-        .as_deref()
-        .unwrap_or(&entry.transcription_text)
+    entry.display_text()
 }
 
 pub fn set_tray_visibility(app: &AppHandle, visible: bool) {
@@ -385,7 +382,7 @@ pub fn copy_last_transcript(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::{last_transcript_text, load_tray_icon};
-    use crate::managers::history::HistoryEntry;
+    use crate::managers::history::{HistoryEntry, PostProcessRun};
 
     fn build_entry(transcription: &str, post_processed: Option<&str>) -> HistoryEntry {
         HistoryEntry {
@@ -395,9 +392,26 @@ mod tests {
             saved: false,
             title: "Recording".to_string(),
             transcription_text: transcription.to_string(),
-            post_processed_text: post_processed.map(|text| text.to_string()),
-            post_process_prompt: None,
-            post_process_requested: false,
+            post_process_requested: post_processed.is_some(),
+            duration_ms: None,
+            word_count: None,
+            processing_ms: None,
+            model_used: None,
+            language: None,
+            last_post_process: post_processed.map(|text| PostProcessRun {
+                id: 1,
+                history_id: 1,
+                timestamp: 0,
+                provider_id: "custom".to_string(),
+                model: None,
+                prompt_id: None,
+                prompt_text: None,
+                input_text: transcription.to_string(),
+                output_text: Some(text.to_string()),
+                duration_ms: None,
+                succeeded: true,
+                error: None,
+            }),
         }
     }
 
@@ -410,6 +424,20 @@ mod tests {
     #[test]
     fn falls_back_to_raw_transcription() {
         let entry = build_entry("raw", None);
+        assert_eq!(last_transcript_text(&entry), "raw");
+    }
+
+    /// A refinement run that failed leaves a row behind with no output. The
+    /// tray must still copy something — the raw transcript — rather than an
+    /// empty string.
+    #[test]
+    fn falls_back_to_raw_transcription_when_refinement_failed() {
+        let mut entry = build_entry("raw", Some("processed"));
+        let run = entry.last_post_process.as_mut().expect("run present");
+        run.output_text = None;
+        run.succeeded = false;
+        run.error = Some("connection refused".to_string());
+
         assert_eq!(last_transcript_text(&entry), "raw");
     }
 

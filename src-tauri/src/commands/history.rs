@@ -1,6 +1,6 @@
 use crate::actions::process_transcription_output;
 use crate::managers::{
-    history::{HistoryManager, PaginatedHistory},
+    history::{HistoryManager, PaginatedHistory, TranscriptionUpdate},
     transcription::TranscriptionManager,
 };
 use std::sync::Arc;
@@ -84,10 +84,14 @@ pub async fn retry_history_entry_transcription(
     transcription_manager.initiate_model_load();
 
     let tm = Arc::clone(&transcription_manager);
+    // Timed like the live path, so a retry's numbers are comparable with the
+    // original run's rather than being left over from it.
+    let started = std::time::Instant::now();
     let transcription = tauri::async_runtime::spawn_blocking(move || tm.transcribe(samples))
         .await
         .map_err(|e| format!("Transcription task panicked: {}", e))?
         .map_err(|e| e.to_string())?;
+    let processing_ms = started.elapsed().as_millis() as i64;
 
     if transcription.is_empty() {
         return Err("Recording contains no speech".to_string());
@@ -95,12 +99,19 @@ pub async fn retry_history_entry_transcription(
 
     let processed =
         process_transcription_output(&app, &transcription, entry.post_process_requested).await;
+    let word_count = transcription.split_whitespace().count() as i64;
+
     history_manager
         .update_transcription(
             id,
-            transcription,
-            processed.post_processed_text,
-            processed.post_process_prompt,
+            TranscriptionUpdate {
+                transcription_text: transcription,
+                word_count: Some(word_count),
+                processing_ms: Some(processing_ms),
+                model_used: Some(crate::settings::get_settings(&app).selected_model),
+                language: Some(processed.effective_language),
+                post_process: processed.post_process,
+            },
         )
         .map(|_| ())
         .map_err(|e| e.to_string())

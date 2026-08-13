@@ -3,7 +3,9 @@ use crate::apple_intelligence;
 use crate::audio_feedback::{play_feedback_sound, play_feedback_sound_blocking, SoundType};
 use crate::audio_toolkit::{is_microphone_access_denied, is_no_input_device_error, VadPolicy};
 use crate::managers::audio::AudioRecordingManager;
-use crate::managers::history::HistoryManager;
+use crate::managers::history::{
+    HistoryManager, NewHistoryEntry, NewPostProcessRun, OPENCC_PROVIDER_ID,
+};
 use crate::managers::model::ModelManager;
 use crate::managers::transcription::StreamWorkKind;
 use crate::managers::transcription::TranscriptionManager;
@@ -118,17 +120,31 @@ fn should_use_streaming_overlay(style: OverlayStyle, is_streaming: bool) -> bool
     style == OverlayStyle::Live && is_streaming
 }
 
-async fn post_process_transcription(settings: &AppSettings, transcription: &str) -> Option<String> {
+/// Refine a transcript with the configured language model.
+///
+/// The three outcomes are kept apart on purpose, because the history records
+/// them differently:
+///
+/// - `Ok(None)` — nothing ran. No provider, model or prompt is configured, or
+///   there was no text to refine. Not a failure, and not worth a history row.
+/// - `Ok(Some(text))` — the model returned refined text.
+/// - `Err(reason)` — a run was attempted and failed. This *is* worth recording:
+///   the share of attempts that fail is what tells you whether a local model is
+///   dependable, and collapsing it into `None` makes that unknowable.
+async fn post_process_transcription(
+    settings: &AppSettings,
+    transcription: &str,
+) -> std::result::Result<Option<String>, String> {
     if is_blank_transcription(transcription) {
         debug!("Post-processing skipped because the transcription is empty");
-        return None;
+        return Ok(None);
     }
 
     let provider = match settings.active_post_process_provider().cloned() {
         Some(provider) => provider,
         None => {
             debug!("Post-processing enabled but no provider is selected");
-            return None;
+            return Ok(None);
         }
     };
 
@@ -143,14 +159,14 @@ async fn post_process_transcription(settings: &AppSettings, transcription: &str)
             "Post-processing skipped because provider '{}' has no model configured",
             provider.id
         );
-        return None;
+        return Ok(None);
     }
 
     let selected_prompt_id = match &settings.post_process_selected_prompt_id {
         Some(id) => id.clone(),
         None => {
             debug!("Post-processing skipped because no prompt is selected");
-            return None;
+            return Ok(None);
         }
     };
 
@@ -165,13 +181,13 @@ async fn post_process_transcription(settings: &AppSettings, transcription: &str)
                 "Post-processing skipped because prompt '{}' was not found",
                 selected_prompt_id
             );
-            return None;
+            return Ok(None);
         }
     };
 
     if prompt.trim().is_empty() {
         debug!("Post-processing skipped because the selected prompt is empty");
-        return None;
+        return Ok(None);
     }
 
     debug!(
@@ -204,7 +220,7 @@ async fn post_process_transcription(settings: &AppSettings, transcription: &str)
                     debug!(
                         "Apple Intelligence selected but not currently available on this device"
                     );
-                    return None;
+                    return Ok(None);
                 }
 
                 let token_limit = model.trim().parse::<i32>().unwrap_or(0);
@@ -216,19 +232,19 @@ async fn post_process_transcription(settings: &AppSettings, transcription: &str)
                     Ok(result) => {
                         if result.trim().is_empty() {
                             debug!("Apple Intelligence returned an empty response");
-                            None
+                            Err("Apple Intelligence returned an empty response".to_string())
                         } else {
                             let result = strip_invisible_chars(&result);
                             debug!(
                                 "Apple Intelligence post-processing succeeded. Output length: {} chars",
                                 result.len()
                             );
-                            Some(result)
+                            Ok(Some(result))
                         }
                     }
                     Err(err) => {
                         error!("Apple Intelligence post-processing failed: {}", err);
-                        None
+                        Err(err.to_string())
                     }
                 };
             }
@@ -236,7 +252,7 @@ async fn post_process_transcription(settings: &AppSettings, transcription: &str)
             #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
             {
                 debug!("Apple Intelligence provider selected on unsupported platform");
-                return None;
+                return Ok(None);
             }
         }
 
@@ -278,10 +294,10 @@ async fn post_process_transcription(settings: &AppSettings, transcription: &str)
                                 provider.id,
                                 result.len()
                             );
-                            return Some(result);
+                            return Ok(Some(result));
                         } else {
                             error!("Structured output response missing 'transcription' field");
-                            return Some(strip_invisible_chars(content));
+                            return Ok(Some(strip_invisible_chars(content)));
                         }
                     }
                     Err(e) => {
@@ -289,13 +305,13 @@ async fn post_process_transcription(settings: &AppSettings, transcription: &str)
                             "Failed to parse structured output JSON: {}. Returning raw content.",
                             e
                         );
-                        return Some(strip_invisible_chars(content));
+                        return Ok(Some(strip_invisible_chars(content)));
                     }
                 }
             }
             Ok(None) => {
                 error!("LLM API response has no content");
-                return None;
+                return Err("LLM API response has no content".to_string());
             }
             Err(e) => {
                 warn!(
@@ -327,11 +343,11 @@ async fn post_process_transcription(settings: &AppSettings, transcription: &str)
                 provider.id,
                 content.len()
             );
-            Some(content)
+            Ok(Some(content))
         }
         Ok(None) => {
             error!("LLM API response has no content");
-            None
+            Err("LLM API response has no content".to_string())
         }
         Err(e) => {
             error!(
@@ -339,7 +355,7 @@ async fn post_process_transcription(settings: &AppSettings, transcription: &str)
                 provider.id,
                 e
             );
-            None
+            Err(e.to_string())
         }
     }
 }
@@ -394,8 +410,13 @@ async fn maybe_convert_chinese_variant(
 
 pub(crate) struct ProcessedTranscription {
     pub final_text: String,
-    pub post_processed_text: Option<String>,
-    pub post_process_prompt: Option<String>,
+    /// The refinement passes, ready to be persisted, in the order they ran.
+    /// Empty means none ran.
+    pub post_process: Vec<NewPostProcessRun>,
+    /// The language the transcription actually ran in. Resolved here anyway;
+    /// carrying it out saves the caller from resolving it a second time and
+    /// possibly disagreeing with what was used.
+    pub effective_language: String,
 }
 
 /// Resolve the persisted language *intent* into the language the currently-loaded
@@ -426,8 +447,7 @@ pub(crate) async fn process_transcription_output(
 ) -> ProcessedTranscription {
     let settings = get_settings(app);
     let mut final_text = transcription.to_string();
-    let mut post_processed_text: Option<String> = None;
-    let mut post_process_prompt: Option<String> = None;
+    let mut runs: Vec<NewPostProcessRun> = Vec::new();
 
     // Resolve the language the transcription actually ran in (the persisted
     // intent coerced against the loaded model's capabilities) so OpenCC keys off
@@ -436,32 +456,99 @@ pub(crate) async fn process_transcription_output(
     if let Some(converted_text) =
         maybe_convert_chinese_variant(&effective_language, transcription).await
     {
+        // Not a language model, but it did rewrite the text, so it is recorded
+        // the same way — the history should be able to answer "why does the
+        // stored text differ from what was transcribed?" in every case.
+        runs.push(NewPostProcessRun {
+            provider_id: OPENCC_PROVIDER_ID.to_string(),
+            model: None,
+            prompt_id: None,
+            prompt_text: None,
+            input_text: final_text.clone(),
+            output_text: Some(converted_text.clone()),
+            duration_ms: None,
+            succeeded: true,
+            error: None,
+        });
         final_text = converted_text;
     }
 
     if post_process {
-        if let Some(processed_text) = post_process_transcription(&settings, &final_text).await {
-            post_processed_text = Some(processed_text.clone());
-            final_text = processed_text;
+        let started = Instant::now();
+        let outcome = post_process_transcription(&settings, &final_text).await;
+        let duration_ms = Some(started.elapsed().as_millis() as i64);
 
-            if let Some(prompt_id) = &settings.post_process_selected_prompt_id {
-                if let Some(prompt) = settings
-                    .post_process_prompts
-                    .iter()
-                    .find(|prompt| &prompt.id == prompt_id)
-                {
-                    post_process_prompt = Some(prompt.prompt.clone());
-                }
+        // Skips leave `run` untouched; only an actual attempt is recorded, and
+        // a failed attempt keeps its reason instead of disappearing.
+        match outcome {
+            Ok(None) => {}
+            Ok(Some(processed_text)) => {
+                runs.push(build_llm_run(
+                    &settings,
+                    final_text.clone(),
+                    Some(processed_text.clone()),
+                    duration_ms,
+                    None,
+                ));
+                final_text = processed_text;
+            }
+            Err(reason) => {
+                runs.push(build_llm_run(
+                    &settings,
+                    final_text.clone(),
+                    None,
+                    duration_ms,
+                    Some(reason),
+                ));
             }
         }
-    } else if final_text != transcription {
-        post_processed_text = Some(final_text.clone());
     }
 
     ProcessedTranscription {
         final_text,
-        post_processed_text,
-        post_process_prompt,
+        post_process: runs,
+        effective_language,
+    }
+}
+
+/// Recording length in milliseconds. The samples reaching this point have
+/// already been resampled to [`WHISPER_SAMPLE_RATE`], so the count converts
+/// directly — no need to consult the input device's rate.
+fn samples_to_ms(sample_count: usize) -> i64 {
+    use crate::audio_toolkit::constants::WHISPER_SAMPLE_RATE;
+    (sample_count as f64 * 1000.0 / f64::from(WHISPER_SAMPLE_RATE)).round() as i64
+}
+
+/// Assemble the record of an LLM refinement pass from the settings it ran under.
+/// The prompt text is copied rather than referenced by id alone, so a later edit
+/// to the prompt does not rewrite the history of what was actually sent.
+fn build_llm_run(
+    settings: &AppSettings,
+    input_text: String,
+    output_text: Option<String>,
+    duration_ms: Option<i64>,
+    error: Option<String>,
+) -> NewPostProcessRun {
+    let provider_id = settings.post_process_provider_id.clone();
+    let prompt_id = settings.post_process_selected_prompt_id.clone();
+    let prompt_text = prompt_id.as_ref().and_then(|id| {
+        settings
+            .post_process_prompts
+            .iter()
+            .find(|prompt| &prompt.id == id)
+            .map(|prompt| prompt.prompt.clone())
+    });
+
+    NewPostProcessRun {
+        model: settings.post_process_models.get(&provider_id).cloned(),
+        provider_id,
+        prompt_id,
+        prompt_text,
+        input_text,
+        succeeded: output_text.is_some(),
+        output_text,
+        duration_ms,
+        error,
     }
 }
 
@@ -708,6 +795,10 @@ impl ShortcutAction for TranscribeAction {
                         Ok(_) => tm.transcribe(samples),
                         Err(err) => Err(err),
                     };
+                    // Captured here rather than read later: everything after
+                    // this point (WAV verification, refinement, pasting) would
+                    // otherwise be counted as speech-to-text time.
+                    let transcription_elapsed = transcription_time.elapsed();
 
                     // Await WAV save and verify
                     let wav_saved = match wav_handle.await {
@@ -744,8 +835,7 @@ impl ShortcutAction for TranscribeAction {
                         Ok(transcription) => {
                             debug!(
                                 "Transcription completed in {:?}: '{}'",
-                                transcription_time.elapsed(),
-                                transcription
+                                transcription_elapsed, transcription
                             );
 
                             if post_process {
@@ -776,13 +866,22 @@ impl ShortcutAction for TranscribeAction {
 
                             // Save to history if WAV was saved
                             if wav_saved {
-                                if let Err(err) = hm.save_entry(
+                                // Counted on the raw transcript, so the metric
+                                // measures the speaker rather than the
+                                // refinement model.
+                                let word_count = transcription.split_whitespace().count() as i64;
+
+                                if let Err(err) = hm.save_entry(NewHistoryEntry {
                                     file_name,
-                                    transcription,
-                                    post_process,
-                                    processed.post_processed_text.clone(),
-                                    processed.post_process_prompt.clone(),
-                                ) {
+                                    transcription_text: transcription,
+                                    post_process_requested: post_process,
+                                    duration_ms: Some(samples_to_ms(sample_count)),
+                                    word_count: Some(word_count),
+                                    processing_ms: Some(transcription_elapsed.as_millis() as i64),
+                                    model_used: Some(get_settings(&ah).selected_model),
+                                    language: Some(processed.effective_language.clone()),
+                                    post_process: processed.post_process.clone(),
+                                }) {
                                     error!("Failed to save history entry: {}", err);
                                 }
                             }
@@ -837,15 +936,16 @@ impl ShortcutAction for TranscribeAction {
                             // Surface the failure to the UI (toast). The full
                             // message is also in murmel.log via the line above.
                             let _ = ah.emit("transcription-error", err.to_string());
-                            // Save entry with empty text so user can retry
+                            // Save entry with empty text so user can retry.
+                            // Only the audio length is known here; the rest
+                            // stays NULL and the statistics skip this row.
                             if wav_saved {
-                                if let Err(save_err) = hm.save_entry(
+                                if let Err(save_err) = hm.save_entry(NewHistoryEntry {
                                     file_name,
-                                    String::new(),
-                                    post_process,
-                                    None,
-                                    None,
-                                ) {
+                                    post_process_requested: post_process,
+                                    duration_ms: Some(samples_to_ms(sample_count)),
+                                    ..Default::default()
+                                }) {
                                     error!("Failed to save failed history entry: {}", save_err);
                                 }
                             }

@@ -268,22 +268,23 @@ Alles ergibt sich aus dem, was ohnehin passiert. Nichts wird zusätzlich beobach
 | Nachbearbeitung genutzt?    | `post_process_requested` (existiert bereits)      |
 | Zeitersparnis (geschätzt)   | Wörter ÷ 40 WPM Tippgeschwindigkeit − Diktatdauer |
 
-### 6.2 Was das Schema dafür braucht
+### 6.2 Was das Schema dafür braucht — erledigt
 
-Die History-Tabelle speichert heute Zeitstempel, Titel, Rohtext und
-nachbearbeiteten Text — aber keine Metriken. Nötig ist eine Migration
-(`src-tauri/src/managers/history.rs`, `MIGRATIONS`):
-
-```sql
-ALTER TABLE transcription_history ADD COLUMN duration_ms INTEGER;
-ALTER TABLE transcription_history ADD COLUMN word_count INTEGER;
-ALTER TABLE transcription_history ADD COLUMN processing_ms INTEGER;
-ALTER TABLE transcription_history ADD COLUMN model_used TEXT;
-ALTER TABLE transcription_history ADD COLUMN language TEXT;
-```
-
-Das Migrationssystem ist additiv — bestehende Einträge bekommen `NULL` und die
+Die Migration liegt in `src-tauri/src/managers/history.rs` (`MIGRATIONS`). Das
+Migrationssystem ist additiv — bestehende Einträge bekommen `NULL` und die
 Statistik rechnet sie schlicht nicht mit.
+
+Die fünf Metrik-Spalten kamen wie geplant dazu. Darüber hinaus wanderte die
+**Nachbearbeitung in eine eigene Tabelle** (`post_process_runs`, §9), statt wie
+ursprünglich skizziert als Spalten auf der History zu bleiben. Zwei Gründe:
+
+1. **Ein Diktat kann mehrfach veredelt werden.** Ohne eigene Tabelle wäre jede
+   zweite Veredelung ein Überschreiben der ersten — und der Command-Mode-Gedanke
+   („markieren, umschreiben lassen") wäre dauerhaft verbaut.
+2. **Fehlgeschlagene Läufe sind eine Kennzahl, kein Nichts.** Vorher gab die
+   Pipeline bei einem LLM-Fehler schlicht `None` zurück, ununterscheidbar von
+   „gar nicht erst versucht". Der Anteil fehlgeschlagener Läufe ist aber genau
+   die Zahl, an der man abliest, ob ein lokales Modell alltagstauglich ist.
 
 ### 6.3 Wie es aussehen soll
 
@@ -451,14 +452,41 @@ CREATE TABLE transcription_history (
     saved                   BOOLEAN NOT NULL DEFAULT 0,
     title                   TEXT NOT NULL,
     transcription_text      TEXT NOT NULL,      -- Rohtranskript
-    post_processed_text     TEXT,               -- veredelte Fassung (§5)
-    post_process_prompt     TEXT,               -- verwendeter Prompt
-    post_process_requested  BOOLEAN NOT NULL DEFAULT 0
+    post_process_requested  BOOLEAN NOT NULL DEFAULT 0,  -- welcher Hotkey
+    duration_ms             INTEGER,            -- Aufnahmelänge
+    word_count              INTEGER,            -- Wörter im *Rohtranskript*
+    processing_ms           INTEGER,            -- reine STT-Zeit
+    model_used              TEXT,
+    language                TEXT                -- effektiv genutzte Sprache
+);
+
+CREATE TABLE post_process_runs (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    history_id   INTEGER NOT NULL REFERENCES transcription_history(id) ON DELETE CASCADE,
+    timestamp    INTEGER NOT NULL,
+    provider_id  TEXT NOT NULL,     -- 'ollama', 'openai', 'opencc', …
+    model        TEXT,
+    prompt_id    TEXT,
+    prompt_text  TEXT,              -- Wortlaut zum Zeitpunkt des Laufs
+    input_text   TEXT NOT NULL,     -- nicht immer das Rohtranskript
+    output_text  TEXT,              -- NULL bei Fehlschlag
+    duration_ms  INTEGER,
+    succeeded    BOOLEAN NOT NULL DEFAULT 0,
+    error        TEXT
 );
 ```
 
-**Geplante Ergänzungen** für die Statistiken (§6.2): `duration_ms`, `word_count`,
-`processing_ms`, `model_used`, `language`.
+Ein Diktat hat **n** Veredelungsläufe. `word_count` zählt bewusst das
+Rohtranskript — die veredelte Fassung zu zählen würde das Sprachmodell messen
+statt den Sprecher. Der `provider_id` `opencc` markiert die
+Chinesisch-Varianten-Konvertierung: kein LLM, aber sie schreibt den Text um, und
+die Historie soll in jedem Fall beantworten können, warum der gespeicherte Text
+vom transkribierten abweicht.
+
+> **Falle, die Geld gekostet hätte:** SQLite erzwingt Fremdschlüssel nur, wenn
+> `PRAGMA foreign_keys = ON` gesetzt ist — **pro Verbindung**, nicht pro
+> Datenbank. Ohne das wäre `ON DELETE CASCADE` wirkungslos gewesen und gelöschte
+> Diktate hätten ihre Läufe als Waisen zurückgelassen. Ein Test deckt das ab.
 
 **Noch offen:** Volltextsuche. `fts5` über `transcription_text` wäre die naheliegende
 Lösung, sobald die Historie mehr als ein paar hundert Einträge hat.
@@ -535,7 +563,8 @@ Erst angehen, wenn Windows und Ubuntu wirklich rundlaufen.
 - [ ] Lokales LLM (Ollama) als Default-Provider für die Nachbearbeitung
 - [ ] Prompt-Presets statt freiem Textfeld (§5.2)
 - [ ] Deutliche UI-Kennzeichnung, wenn ein Cloud-Provider aktiv ist
-- [ ] History-Migration um Metrik-Spalten erweitern (§6.2)
+- [x] History-Migration um Metrik-Spalten erweitern (§6.2) — plus eigene
+      Tabelle `post_process_runs` für die Veredelungsläufe (§9)
 - [ ] Insights-Ansicht: Wörter, Zeitersparnis, Modell-Performance (§6.3)
 - [ ] UI-Reduktion: i18n auf DE/EN, Onboarding eindampfen (§4.2)
 

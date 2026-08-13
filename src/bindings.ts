@@ -978,7 +978,16 @@ export type EngineType =
  */
 "TranscribeCpp" | "Parakeet" | "Moonshine" | "MoonshineStreaming" | "SenseVoice" | "GigaAM" | "Canary" | "Cohere"
 export type GpuDeviceOption = { id: number; name: string; total_vram_mb: number }
-export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string; post_processed_text: string | null; post_process_prompt: string | null; post_process_requested: boolean }
+export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string;
+/**
+ * Whether refinement was *asked for* (which hotkey was pressed) — a
+ * property of the dictation, unlike the runs themselves.
+ */
+post_process_requested: boolean; duration_ms: number | null; word_count: number | null; processing_ms: number | null; model_used: string | null; language: string | null;
+/**
+ * Most recent run from `post_process_runs`, if any.
+ */
+last_post_process: PostProcessRun | null }
 export type HistoryUpdatePayload = { action: "added"; entry: HistoryEntry } | { action: "updated"; entry: HistoryEntry } | { action: "deleted"; id: number } | { action: "toggled"; id: number }
 /**
  * Result of changing keyboard implementation
@@ -1036,6 +1045,20 @@ export type PaginatedHistory = { entries: HistoryEntry[]; has_more: boolean }
 export type PasteMethod = "ctrl_v" | "direct" | "none" | "shift_insert" | "ctrl_shift_v" | "external_script"
 export type PermissionAccess = "allowed" | "denied" | "unknown"
 export type PostProcessProvider = { id: string; label: string; base_url: string; allow_base_url_edit?: boolean; models_endpoint?: string | null; supports_structured_output?: boolean }
+/**
+ * A single pass of a transcript through text refinement — an LLM call, or the
+ * Chinese-variant conversion (see [`OPENCC_PROVIDER_ID`]).
+ *
+ * Failed runs are recorded too, with `succeeded = false` and the reason in
+ * `error`. That is deliberate: the share of runs that fail is the number that
+ * tells you whether a local model is actually dependable.
+ */
+export type PostProcessRun = { id: number; history_id: number; timestamp: number; provider_id: string; model: string | null; prompt_id: string | null; prompt_text: string | null;
+/**
+ * What the model was given. Usually the raw transcript, but not
+ * necessarily — a second pass refines the first pass's output.
+ */
+input_text: string; output_text: string | null; duration_ms: number | null; succeeded: boolean; error: string | null }
 export type RecordingRetentionPeriod = "never" | "preserve_limit" | "days_3" | "weeks_2" | "months_3"
 export type SecretMap = Partial<{ [key in string]: string }>
 export type SecureInputStatus = { 
