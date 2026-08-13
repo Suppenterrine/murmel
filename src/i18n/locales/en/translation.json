@@ -457,6 +457,15 @@
       "openFolder": "Open Recordings Folder",
       "loading": "Loading history...",
       "empty": "No transcriptions yet. Start recording to build your history!",
+      "metrics": {
+        "duration": "{{seconds}}s spoken",
+        "wpm": "{{wpm}} words/min",
+        "processing": "{{seconds}}s recognised",
+        "refinementFailed": "Refinement failed"
+      },
+      "searchPlaceholder": "Search history…",
+      "onlyFavorites": "Favourites only",
+      "noMatches": "Nothing found. Try different terms, or clear the favourites filter.",
       "copyToClipboard": "Copy transcription to clipboard",
       "save": "Save transcription",
       "unsave": "Remove from saved",

@@ -264,6 +264,14 @@ async fetchPostProcessModels(providerId: string) : Promise<Result<string[], stri
     else return { status: "error", error: e  as any };
 }
 },
+async searchHistoryEntries(query: string | null, onlySaved: boolean, limit: number | null) : Promise<Result<HistoryEntry[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("search_history_entries", { query, onlySaved, limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async checkPostProcessEndpoint(providerId: string) : Promise<Result<EndpointStatus, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("check_post_process_endpoint", { providerId }) };

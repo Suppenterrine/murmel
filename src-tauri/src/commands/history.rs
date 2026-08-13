@@ -1,6 +1,6 @@
 use crate::actions::process_transcription_output;
 use crate::managers::{
-    history::{HistoryManager, PaginatedHistory, TranscriptionUpdate},
+    history::{HistoryEntry, HistoryManager, PaginatedHistory, TranscriptionUpdate},
     transcription::TranscriptionManager,
 };
 use std::sync::Arc;
@@ -16,6 +16,27 @@ pub async fn get_history_entries(
 ) -> Result<PaginatedHistory, String> {
     history_manager
         .get_history_entries(cursor, limit)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Search the history, optionally limited to saved entries.
+///
+/// Separate from `get_history_entries` rather than an extra parameter there:
+/// that one pages through the history by cursor, this one ranks by relevance,
+/// and mixing the two would mean a cursor that means different things depending
+/// on whether a search term is present.
+#[tauri::command]
+#[specta::specta]
+pub async fn search_history_entries(
+    _app: AppHandle,
+    history_manager: State<'_, Arc<HistoryManager>>,
+    query: Option<String>,
+    only_saved: bool,
+    limit: Option<usize>,
+) -> Result<Vec<HistoryEntry>, String> {
+    history_manager
+        .search_history_entries(query, only_saved, limit)
         .await
         .map_err(|e| e.to_string())
 }

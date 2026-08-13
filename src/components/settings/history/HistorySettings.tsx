@@ -1,7 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { readFile } from "@tauri-apps/plugin-fs";
-import { Check, Copy, FolderOpen, RotateCcw, Star, Trash2 } from "lucide-react";
+import {
+  Check,
+  Copy,
+  FolderOpen,
+  RotateCcw,
+  Search,
+  Star,
+  Trash2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
@@ -65,6 +73,11 @@ export const HistorySettings: React.FC = () => {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
+  const [search, setSearch] = useState("");
+  const [onlySaved, setOnlySaved] = useState(false);
+  // Any active filter switches from cursor paging to a ranked search, so the
+  // two never have to agree on what a cursor means.
+  const isFiltered = search.trim().length > 0 || onlySaved;
   const sentinelRef = useRef<HTMLDivElement>(null);
   const entriesRef = useRef<HistoryEntry[]>([]);
   const loadingRef = useRef(false);
@@ -101,14 +114,49 @@ export const HistorySettings: React.FC = () => {
     }
   }, []);
 
-  // Initial load
+  // Initial load — only while unfiltered; the search effect below owns the
+  // list as soon as a filter is set.
   useEffect(() => {
+    if (isFiltered) return;
     loadPage();
-  }, [loadPage]);
+  }, [loadPage, isFiltered]);
+
+  // Filtered view. Debounced because it runs on every keystroke, and a search
+  // that fires per character makes the list flicker on the way to a word.
+  useEffect(() => {
+    if (!isFiltered) return;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const result = await commands.searchHistoryEntries(
+          search.trim() || null,
+          onlySaved,
+          100,
+        );
+        if (cancelled) return;
+        if (result.status === "ok") {
+          setEntries(result.data);
+          // A search returns its whole result at once — nothing left to page.
+          setHasMore(false);
+        }
+      } catch (error) {
+        console.error("Failed to search history entries:", error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 200);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [search, onlySaved, isFiltered]);
 
   // Infinite scroll via IntersectionObserver
   useEffect(() => {
-    if (loading) return;
+    if (loading || isFiltered) return;
 
     const sentinel = sentinelRef.current;
     if (!sentinel || !hasMore) return;
@@ -245,7 +293,9 @@ export const HistorySettings: React.FC = () => {
   } else if (entries.length === 0) {
     content = (
       <div className="px-4 py-3 text-center text-text/60">
-        {t("settings.history.empty")}
+        {isFiltered
+          ? t("settings.history.noMatches")
+          : t("settings.history.empty")}
       </div>
     );
   } else {
@@ -286,6 +336,28 @@ export const HistorySettings: React.FC = () => {
             label={t("settings.history.openFolder")}
           />
         </div>
+
+        <div className="px-4 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text/40 pointer-events-none" />
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t("settings.history.searchPlaceholder")}
+              aria-label={t("settings.history.searchPlaceholder")}
+              className="w-full ps-9 pe-3 py-2 text-sm rounded-md bg-background border border-mid-gray/20 text-text placeholder:text-text/40 focus:outline-none focus:border-logo-primary/50"
+            />
+          </div>
+          <IconButton
+            onClick={() => setOnlySaved((previous) => !previous)}
+            title={t("settings.history.onlyFavorites")}
+            active={onlySaved}
+          >
+            <Star className={`w-4 h-4 ${onlySaved ? "fill-current" : ""}`} />
+          </IconButton>
+        </div>
+
         <div className="bg-background border border-mid-gray/20 rounded-lg overflow-visible">
           {content}
         </div>
@@ -441,7 +513,68 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
             : t("settings.history.transcriptionFailed")}
       </p>
 
+      <EntryMetrics entry={entry} />
+
       <AudioPlayer onLoadRequest={handleLoadAudio} className="w-full" />
     </div>
+  );
+};
+
+/**
+ * The numbers behind one dictation: how fast it was spoken, how long the model
+ * took, and what happened during refinement.
+ *
+ * Everything is optional — entries from before these were recorded simply show
+ * less, rather than a row of dashes.
+ */
+const EntryMetrics: React.FC<{ entry: HistoryEntry }> = ({ entry }) => {
+  const { t } = useTranslation();
+
+  const parts: string[] = [];
+
+  if (entry.duration_ms && entry.duration_ms > 0) {
+    parts.push(
+      t("settings.history.metrics.duration", {
+        seconds: (entry.duration_ms / 1000).toFixed(1),
+      }),
+    );
+
+    if (entry.word_count) {
+      // Words per minute — the number that says whether dictating is actually
+      // faster than typing.
+      const wpm = Math.round(entry.word_count / (entry.duration_ms / 60000));
+      parts.push(t("settings.history.metrics.wpm", { wpm }));
+    }
+  }
+
+  if (entry.processing_ms && entry.processing_ms > 0) {
+    parts.push(
+      t("settings.history.metrics.processing", {
+        seconds: (entry.processing_ms / 1000).toFixed(1),
+      }),
+    );
+  }
+
+  if (entry.model_used) parts.push(entry.model_used);
+
+  const run = entry.last_post_process;
+  const refinementFailed = run != null && !run.succeeded;
+
+  if (parts.length === 0 && !refinementFailed) return null;
+
+  return (
+    <p className="text-xs text-text/40 flex flex-wrap items-center gap-x-2 gap-y-1">
+      {parts.map((part, index) => (
+        <span key={part}>
+          {index > 0 && <span className="me-2 text-text/25">·</span>}
+          {part}
+        </span>
+      ))}
+      {refinementFailed && (
+        <span className="text-warning" title={run?.error ?? undefined}>
+          {t("settings.history.metrics.refinementFailed")}
+        </span>
+      )}
+    </p>
   );
 };

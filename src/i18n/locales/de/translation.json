@@ -457,6 +457,15 @@
       "openFolder": "Aufnahmeordner öffnen",
       "loading": "Verlauf wird geladen...",
       "empty": "Noch keine Transkriptionen. Starte eine Aufnahme, um deinen Verlauf aufzubauen!",
+      "metrics": {
+        "duration": "{{seconds}} s gesprochen",
+        "wpm": "{{wpm}} Wörter/Min",
+        "processing": "{{seconds}} s erkannt",
+        "refinementFailed": "Nachbearbeitung fehlgeschlagen"
+      },
+      "searchPlaceholder": "Verlauf durchsuchen …",
+      "onlyFavorites": "Nur Favoriten",
+      "noMatches": "Nichts gefunden. Andere Suchbegriffe versuchen oder den Favoritenfilter aufheben.",
       "copyToClipboard": "Transkription in Zwischenablage kopieren",
       "save": "Transkription speichern",
       "unsave": "Aus Gespeicherten entfernen",

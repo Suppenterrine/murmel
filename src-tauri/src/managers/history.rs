@@ -81,6 +81,86 @@ static MIGRATIONS: &[M] = &[
         ALTER TABLE transcription_history DROP COLUMN post_processed_text;
         ALTER TABLE transcription_history DROP COLUMN post_process_prompt;",
     ),
+    // Usage statistics outlive the history.
+    //
+    // The metric columns added above were attached to `transcription_history`,
+    // which `cleanup_by_count` deletes rows from — with a default limit of five
+    // entries. The statistics of §6.3 could therefore never have covered more
+    // than the last five dictations.
+    //
+    // Splitting them apart is what §6.3 asks for anyway ("reset statistics
+    // without losing the history — and vice versa"), and it has a pleasant
+    // consequence: this table holds no transcript, no prompt and no file name,
+    // only numbers, model names and timestamps. It is unobjectionable to keep
+    // for years, precisely because it cannot say *what* was dictated.
+    //
+    // `history_id` deliberately carries no foreign key. A reference with
+    // ON DELETE CASCADE would drag these rows out with the history — exactly
+    // what this table exists to prevent — so it dangles once the entry is gone,
+    // and is only used to attribute a later retry to the right row.
+    M::up(
+        "CREATE TABLE usage_stats (
+            id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+            history_id             INTEGER,
+            timestamp              INTEGER NOT NULL,
+            duration_ms            INTEGER,
+            word_count             INTEGER,
+            processing_ms          INTEGER,
+            model_used             TEXT,
+            language               TEXT,
+            post_process_requested  BOOLEAN NOT NULL DEFAULT 0,
+            post_process_provider  TEXT,
+            post_process_model     TEXT,
+            post_process_ms        INTEGER,
+            post_process_succeeded BOOLEAN
+        );
+        CREATE INDEX idx_usage_stats_timestamp ON usage_stats(timestamp);
+        CREATE UNIQUE INDEX idx_usage_stats_history ON usage_stats(history_id);
+        INSERT INTO usage_stats (
+            history_id, timestamp, duration_ms, word_count, processing_ms,
+            model_used, language, post_process_requested
+        )
+        SELECT
+            id, timestamp, duration_ms, word_count, processing_ms,
+            model_used, language, post_process_requested
+        FROM transcription_history;
+        ALTER TABLE transcription_history DROP COLUMN duration_ms;
+        ALTER TABLE transcription_history DROP COLUMN word_count;
+        ALTER TABLE transcription_history DROP COLUMN processing_ms;
+        ALTER TABLE transcription_history DROP COLUMN model_used;
+        ALTER TABLE transcription_history DROP COLUMN language;",
+    ),
+    // Full-text search over the transcripts.
+    //
+    // An external-content index: fts5 stores only the inverted index and reads
+    // the text from `transcription_history`, so the transcripts are not held
+    // twice. The price is that the triggers below have to be right — an
+    // external-content index does not notice changes on its own, and a missed
+    // delete leaves a phantom that matches searches forever.
+    M::up(
+        "CREATE VIRTUAL TABLE transcription_search USING fts5(
+            transcription_text,
+            content='transcription_history',
+            content_rowid='id',
+            tokenize='unicode61 remove_diacritics 2'
+        );
+        INSERT INTO transcription_search(rowid, transcription_text)
+            SELECT id, transcription_text FROM transcription_history;
+        CREATE TRIGGER transcription_history_ai AFTER INSERT ON transcription_history BEGIN
+            INSERT INTO transcription_search(rowid, transcription_text)
+            VALUES (new.id, new.transcription_text);
+        END;
+        CREATE TRIGGER transcription_history_ad AFTER DELETE ON transcription_history BEGIN
+            INSERT INTO transcription_search(transcription_search, rowid, transcription_text)
+            VALUES ('delete', old.id, old.transcription_text);
+        END;
+        CREATE TRIGGER transcription_history_au AFTER UPDATE ON transcription_history BEGIN
+            INSERT INTO transcription_search(transcription_search, rowid, transcription_text)
+            VALUES ('delete', old.id, old.transcription_text);
+            INSERT INTO transcription_search(rowid, transcription_text)
+            VALUES (new.id, new.transcription_text);
+        END;",
+    ),
 ];
 
 /// Provider id recorded for the Chinese-variant conversion, which is a text
@@ -99,8 +179,8 @@ pub const OPENCC_PROVIDER_ID: &str = "opencc";
 /// join and the mapper would silently read the wrong one.
 const ENTRY_SELECT: &str = "SELECT
         h.id, h.file_name, h.timestamp, h.saved, h.title, h.transcription_text,
-        h.post_process_requested, h.duration_ms, h.word_count, h.processing_ms,
-        h.model_used, h.language,
+        h.post_process_requested,
+        s.duration_ms, s.word_count, s.processing_ms, s.model_used, s.language,
         r.id AS pp_id,
         r.timestamp AS pp_timestamp,
         r.provider_id AS pp_provider_id,
@@ -113,6 +193,7 @@ const ENTRY_SELECT: &str = "SELECT
         r.succeeded AS pp_succeeded,
         r.error AS pp_error
      FROM transcription_history h
+     LEFT JOIN usage_stats s ON s.history_id = h.id
      LEFT JOIN post_process_runs r ON r.id = (
          SELECT id FROM post_process_runs
          WHERE history_id = h.id
@@ -438,7 +519,7 @@ impl HistoryManager {
     /// The refinement run, if there was one, is written in the same transaction:
     /// entry and run are one event to the user, and splitting them would let the
     /// UI show the raw transcript for a moment before the polished text lands.
-    pub fn save_entry(&self, new_entry: NewHistoryEntry) -> Result<HistoryEntry> {
+    pub fn save_entry(&self, mut new_entry: NewHistoryEntry) -> Result<HistoryEntry> {
         let timestamp = Utc::now().timestamp();
         let title = self.format_timestamp_title(timestamp);
 
@@ -451,13 +532,8 @@ impl HistoryManager {
                 saved,
                 title,
                 transcription_text,
-                post_process_requested,
-                duration_ms,
-                word_count,
-                processing_ms,
-                model_used,
-                language
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                post_process_requested
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 &new_entry.file_name,
                 timestamp,
@@ -465,19 +541,21 @@ impl HistoryManager {
                 &title,
                 &new_entry.transcription_text,
                 new_entry.post_process_requested,
-                new_entry.duration_ms,
-                new_entry.word_count,
-                new_entry.processing_ms,
-                &new_entry.model_used,
-                &new_entry.language,
             ],
         )?;
         let id = tx.last_insert_rowid();
 
+        // Taken out rather than iterated in place: the statistics row below
+        // still needs the rest of `new_entry`.
         let mut last_post_process = None;
-        for run in new_entry.post_process {
+        for run in std::mem::take(&mut new_entry.post_process) {
             last_post_process = Some(Self::insert_post_process_run(&tx, id, timestamp, run)?);
         }
+
+        // Written in the same transaction, but into a table the cleanup never
+        // touches — this row survives the transcript it describes.
+        Self::insert_usage_stats(&tx, id, timestamp, &new_entry, last_post_process.as_ref())?;
+
         tx.commit()?;
 
         let entry = HistoryEntry {
@@ -510,6 +588,45 @@ impl HistoryManager {
         }
 
         Ok(entry)
+    }
+
+    /// Record the numbers for one dictation, without any of its text.
+    ///
+    /// Of several refinement passes only the last is summarised: the questions
+    /// this table answers — how often refinement is used, how often it fails,
+    /// which model it runs on — do not need every intermediate pass, and the
+    /// full sequence is in `post_process_runs` for as long as the entry lives.
+    fn insert_usage_stats(
+        conn: &Connection,
+        history_id: i64,
+        timestamp: i64,
+        entry: &NewHistoryEntry,
+        last_run: Option<&PostProcessRun>,
+    ) -> Result<()> {
+        conn.execute(
+            "INSERT INTO usage_stats (
+                history_id, timestamp, duration_ms, word_count, processing_ms,
+                model_used, language, post_process_requested,
+                post_process_provider, post_process_model, post_process_ms,
+                post_process_succeeded
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![
+                history_id,
+                timestamp,
+                entry.duration_ms,
+                entry.word_count,
+                entry.processing_ms,
+                &entry.model_used,
+                &entry.language,
+                entry.post_process_requested,
+                last_run.map(|run| &run.provider_id),
+                last_run.and_then(|run| run.model.as_ref()),
+                last_run.and_then(|run| run.duration_ms),
+                last_run.map(|run| run.succeeded),
+            ],
+        )?;
+
+        Ok(())
     }
 
     /// Write one refinement run. Shared by the initial save and by later passes
@@ -571,15 +688,25 @@ impl HistoryManager {
         let mut conn = self.get_connection()?;
         let tx = conn.transaction()?;
         let updated = tx.execute(
-            "UPDATE transcription_history
-             SET transcription_text = ?1,
-                 word_count = ?2,
-                 processing_ms = ?3,
-                 model_used = ?4,
-                 language = ?5
-             WHERE id = ?6",
+            "UPDATE transcription_history SET transcription_text = ?1 WHERE id = ?2",
+            params![&update.transcription_text, id],
+        )?;
+
+        if updated == 0 {
+            return Err(anyhow!("History entry {} not found", id));
+        }
+
+        // The existing statistics row is rewritten rather than joined by a
+        // second one: a retry replaces the transcript, it does not mean the
+        // user dictated twice. Counting both would inflate the word totals.
+        tx.execute(
+            "UPDATE usage_stats
+             SET word_count = ?1,
+                 processing_ms = ?2,
+                 model_used = ?3,
+                 language = ?4
+             WHERE history_id = ?5",
             params![
-                &update.transcription_text,
                 update.word_count,
                 update.processing_ms,
                 &update.model_used,
@@ -587,10 +714,6 @@ impl HistoryManager {
                 id,
             ],
         )?;
-
-        if updated == 0 {
-            return Err(anyhow!("History entry {} not found", id));
-        }
 
         let now = Utc::now().timestamp();
         for run in update.post_process {
@@ -782,6 +905,70 @@ impl HistoryManager {
         Ok(PaginatedHistory { entries, has_more })
     }
 
+    /// Turn user input into a safe fts5 query.
+    ///
+    /// fts5 `MATCH` takes a query language of its own: bare `AND`, `OR`, `-`,
+    /// `*` or an unbalanced quote are syntax, and a stray one makes the whole
+    /// query fail rather than find nothing. Someone typing into a search box
+    /// means none of that, so every token is quoted (with `"` doubled to escape
+    /// it) and a `*` appended, which is what makes the search feel live while
+    /// still typing a word.
+    fn to_fts_query(input: &str) -> Option<String> {
+        let query = input
+            .split_whitespace()
+            .map(|token| format!("\"{}\"*", token.replace('"', "\"\"")))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        (!query.is_empty()).then_some(query)
+    }
+
+    /// Search transcripts, optionally limited to saved entries.
+    ///
+    /// An empty query is not an error — it means "no text filter", so the
+    /// favourites toggle works on its own.
+    pub async fn search_history_entries(
+        &self,
+        query: Option<String>,
+        only_saved: bool,
+        limit: Option<usize>,
+    ) -> Result<Vec<HistoryEntry>> {
+        let conn = self.get_connection()?;
+        let limit = limit.unwrap_or(100).min(500) as i64;
+        let fts_query = query.as_deref().and_then(Self::to_fts_query);
+
+        let saved_clause = if only_saved { " AND h.saved = 1" } else { "" };
+
+        let (sql, params): (String, Vec<Box<dyn rusqlite::ToSql>>) = match fts_query {
+            Some(fts) => (
+                // Ranked by fts5's own relevance, not by date: when searching,
+                // the best match matters more than the newest entry.
+                format!(
+                    "{ENTRY_SELECT}
+                     JOIN transcription_search ON transcription_search.rowid = h.id
+                     WHERE transcription_search MATCH ?1{saved_clause}
+                     ORDER BY rank
+                     LIMIT ?2"
+                ),
+                vec![Box::new(fts), Box::new(limit)],
+            ),
+            None => (
+                format!("{ENTRY_SELECT} WHERE 1 = 1{saved_clause} ORDER BY h.id DESC LIMIT ?1"),
+                vec![Box::new(limit)],
+            ),
+        };
+
+        let mut stmt = conn.prepare(&sql)?;
+        let entries = stmt
+            .query_map(
+                rusqlite::params_from_iter(params.iter()),
+                Self::map_history_entry,
+            )?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        Ok(entries)
+    }
+
     #[cfg(test)]
     fn get_latest_entry_with_conn(conn: &Connection) -> Result<Option<HistoryEntry>> {
         let mut stmt =
@@ -907,6 +1094,22 @@ mod tests {
         conn
     }
 
+    /// Run a search the way the manager does, but against a bare connection.
+    fn search_ids(conn: &Connection, query: &str) -> Vec<i64> {
+        let fts = HistoryManager::to_fts_query(query).expect("non-empty query");
+        let mut stmt = conn
+            .prepare(
+                "SELECT rowid FROM transcription_search
+                 WHERE transcription_search MATCH ?1 ORDER BY rank",
+            )
+            .expect("prepare search");
+
+        stmt.query_map([&fts], |row| row.get::<_, i64>(0))
+            .expect("run search")
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .expect("collect hits")
+    }
+
     fn insert_entry(conn: &Connection, timestamp: i64, text: &str, post_processed: Option<&str>) {
         conn.execute(
             "INSERT INTO transcription_history (
@@ -928,8 +1131,25 @@ mod tests {
         )
         .expect("insert history entry");
 
+        // Held on to: every further insert moves `last_insert_rowid` on.
+        let history_id = conn.last_insert_rowid();
+
+        // The manager writes this row alongside every entry; the tests have to
+        // do the same or the statistics assertions would be vacuous.
+        conn.execute(
+            "INSERT INTO usage_stats (history_id, timestamp, duration_ms, word_count, model_used)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                history_id,
+                timestamp,
+                4200,
+                text.split_whitespace().count() as i64,
+                "whisper-large-v3-turbo",
+            ],
+        )
+        .expect("insert usage stats");
+
         if let Some(output) = post_processed {
-            let history_id = conn.last_insert_rowid();
             HistoryManager::insert_post_process_run(
                 conn,
                 history_id,
@@ -1078,6 +1298,115 @@ mod tests {
             })
             .expect("count runs");
         assert_eq!(remaining, 0);
+    }
+
+    /// The whole point of the separate table: `cleanup_by_count` deletes
+    /// transcripts, and the statistics must not go with them. With the default
+    /// limit of five entries, anything else would cap the statistics at five
+    /// dictations forever.
+    #[test]
+    fn statistics_survive_the_history_being_cleaned_up() {
+        let conn = setup_conn();
+        for timestamp in 1..=10 {
+            insert_entry(&conn, timestamp, "gesprochener text", None);
+        }
+
+        // Simulate the cleanup keeping only the newest three entries.
+        conn.execute("DELETE FROM transcription_history WHERE id <= 7", [])
+            .expect("cleanup");
+
+        let entries: i64 = conn
+            .query_row("SELECT COUNT(*) FROM transcription_history", [], |r| {
+                r.get(0)
+            })
+            .expect("count entries");
+        let stats: i64 = conn
+            .query_row("SELECT COUNT(*) FROM usage_stats", [], |r| r.get(0))
+            .expect("count stats");
+
+        assert_eq!(entries, 3);
+        assert_eq!(stats, 10, "statistics must outlive the transcripts");
+    }
+
+    /// The statistics table must never be able to reveal *what* was dictated —
+    /// that is what makes it safe to keep indefinitely.
+    #[test]
+    fn statistics_hold_no_transcript_text() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "streng geheimer inhalt", Some("veredelt"));
+
+        let columns: Vec<String> = conn
+            .prepare("SELECT * FROM usage_stats")
+            .expect("prepare")
+            .column_names()
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+
+        for forbidden in [
+            "transcription_text",
+            "output_text",
+            "input_text",
+            "prompt_text",
+            "file_name",
+            "title",
+        ] {
+            assert!(
+                !columns.contains(&forbidden.to_string()),
+                "usage_stats must not carry {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn full_text_search_finds_entries() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "Termin beim Zahnarzt vereinbaren", None);
+        insert_entry(&conn, 200, "Einkaufsliste: Brot und Milch", None);
+
+        let hits = search_ids(&conn, "zahnarzt");
+        assert_eq!(hits.len(), 1);
+
+        // Prefix matching, so the search reacts while still typing.
+        assert_eq!(search_ids(&conn, "einkauf").len(), 1);
+        assert_eq!(search_ids(&conn, "milch brot").len(), 1);
+        assert!(search_ids(&conn, "urlaub").is_empty());
+    }
+
+    /// fts5 has a query language of its own. Input from a search box is not
+    /// written in it, so operators must be treated as literal text rather than
+    /// making the whole query fail.
+    #[test]
+    fn search_input_is_not_treated_as_query_syntax() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "Ergebnis war gut", None);
+
+        for input in ["AND", "OR", "-", "\"", "*", "NEAR(", "gut OR"] {
+            let query = HistoryManager::to_fts_query(input);
+            if let Some(query) = query {
+                let result = conn
+                    .prepare("SELECT rowid FROM transcription_search WHERE transcription_search MATCH ?1")
+                    .expect("prepare")
+                    .query_map([&query], |row| row.get::<_, i64>(0))
+                    .map(|rows| rows.count());
+                assert!(result.is_ok(), "{input:?} must not break the query");
+            }
+        }
+    }
+
+    /// An external-content fts5 index does not notice deletions by itself. A
+    /// missing delete trigger leaves a phantom that keeps matching searches
+    /// after the entry is long gone.
+    #[test]
+    fn deleting_an_entry_removes_it_from_the_search_index() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "Zahnarzttermin", None);
+        assert_eq!(search_ids(&conn, "zahnarzttermin").len(), 1);
+
+        conn.execute("DELETE FROM transcription_history WHERE id = 1", [])
+            .expect("delete entry");
+
+        assert!(search_ids(&conn, "zahnarzttermin").is_empty());
     }
 
     /// Rows written under the old schema keep their refined text, and the two
