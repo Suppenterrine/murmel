@@ -217,6 +217,13 @@ jobs:
         if: ${{ inputs.target != '' && !contains(inputs.target, 'x86_64-unknown-linux-gnu') && !contains(inputs.target, 'aarch64-unknown-linux-gnu') && !contains(inputs.target, 'x86_64-pc-windows-msvc') }}
         run: rustup target add ${{ inputs.target }}
 
+      # Murmel has no Apple Developer certificate, and macOS is not a target
+      # platform (see Murmel_Northstar.md §3). Without this guard the step feeds
+      # an empty secret to `security import`, which fails and turns every
+      # release red even though Windows and Linux built fine.
+      #
+      # The check lives in the script rather than in `if:` because the `secrets`
+      # context is not available in step conditions.
       - name: import Apple Developer Certificate
         if: contains(inputs.platform, 'macos') && inputs.sign-binaries
         env:
@@ -224,6 +231,10 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "APPLE_CERTIFICATE is not set — building macOS unsigned."
+            exit 0
+          fi
           echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
@@ -233,9 +244,17 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
           security find-identity -v -p codesigning build.keychain
 
+      # Leaves CERT_ID unset when there is no certificate, which makes
+      # APPLE_SIGNING_IDENTITY empty further down and tauri-action skip signing.
       - name: verify certificate
         if: contains(inputs.platform, 'macos') && inputs.sign-binaries
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
         run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "No certificate imported — skipping identity lookup."
+            exit 0
+          fi
           CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application")
           CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
           echo "CERT_ID=$CERT_ID" >> $GITHUB_ENV
