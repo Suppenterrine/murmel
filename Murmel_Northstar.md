@@ -222,10 +222,23 @@ größte Gewinn der Fork-Entscheidung:
 | Baustein                | Wo                            | Was es kann                                                                                          |
 | ----------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
 | **LLM-Client**          | `src-tauri/src/llm_client.rs` | OpenAI-kompatible Chat-Completions, Structured Outputs, Reasoning-Abschaltung mit Provider-Fallbacks |
-| **Provider-Verwaltung** | `src-tauri/src/settings.rs`   | Mehrere Endpunkte parallel, API-Keys verschlüsselt abgelegt                                          |
-| **Prompt-System**       | `post_process_prompts`        | Frei definierbare Prompts, per Auswahl umschaltbar                                                   |
+| **Provider-Verwaltung** | `src-tauri/src/settings.rs`   | Mehrere Endpunkte parallel (Ollama, OpenAI, OpenRouter, Anthropic, Groq, …), je eigener Schlüssel     |
+| **Prompt-System**       | `post_process_prompts`        | Vier Presets plus frei definierbare Prompts, per Auswahl umschaltbar                                 |
 | **Zweiter Hotkey**      | `--toggle-post-process`       | Diktat _mit_ Nachbearbeitung, getrennt vom normalen Diktat                                           |
-| **Historie**            | `transcription_history`       | Speichert Rohtext **und** nachbearbeiteten Text nebeneinander                                        |
+| **Historie**            | `post_process_runs`           | Ein Eintrag je Veredelungslauf, auch für fehlgeschlagene (§9)                                        |
+
+> **Korrektur zu einer früheren Fassung dieses Dokuments:** Hier stand
+> „API-Keys verschlüsselt abgelegt". Das ist falsch. `SecretMap` verhindert
+> lediglich, dass Schlüssel in Logausgaben landen (`[REDACTED]` in der
+> `Debug`-Ausgabe) — gespeichert werden sie **im Klartext** in
+> `settings_store.json` im App-Data-Verzeichnis.
+>
+> Für ein Ein-Personen-Werkzeug auf dem eigenen Rechner ist das vertretbar: Wer
+> Zugriff auf dieses Verzeichnis hat, hat ohnehin Zugriff auf die Diktathistorie.
+> Es ist aber kein Schutz, auf den man sich berufen sollte. Echte Verschlüsselung
+> hieße, den Schlüsselbund des Betriebssystems zu nutzen (Windows DPAPI,
+> Secret Service auf Linux) — offen, falls jemals ein Cloud-Provider dauerhaft
+> im Einsatz ist.
 
 Ein Diktat kann also schon heute roh **oder** veredelt eingefügt werden — der
 Unterschied liegt nur am gedrückten Hotkey.
