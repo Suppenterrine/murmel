@@ -1,7 +1,7 @@
 # Murmel — Northstar & Projekt-Dokumentation
 
 > **Ein persönlicher WisprFlow-Clone.**
-> Kein SaaS. Kein Cloud-Zwang. Kein Vibe-Coder-Bloat.
+> Kein SaaS. Kein Cloud-Zwang. Kein Bloat.
 > Nur du, deine Stimme und dein Text.
 
 **Stand:** August 2026 · Fork-Basis: [cjpais/Handy](https://github.com/cjpais/Handy) `b50b52a` (MIT)
@@ -54,14 +54,18 @@ WisprFlow ist ein exzellentes Produkt, aber:
 - **Schwere App** — das UI fühlt sich träge an, das Overlay ist nicht verschiebbar
 - **Keine echte Kontrolle** — man ist an deren Update-Zyklus und Geschäftsmodell gebunden
 
-### Das Problem mit Vibe-Coder-Clones
+### Warum keiner der freien Nachbauten
 
-Auf GitHub gibt es Dutzende "WisprFlow-Clones", die meisten davon:
+Auf GitHub gibt es einige freie WisprFlow-Alternativen. Sie sind meist in der
+Freizeit entstanden und verdienen Respekt dafür — für den täglichen Einsatz über
+Jahre hinweg passen sie mir trotzdem nicht:
 
-- **Abandoned** nach 3 Monaten (z. B. `savbell/whisper-writer`, letzter Commit August 2024)
-- **Unzuverlässig** — funktionieren, bis das nächste OS-Update alles bricht
-- **Unportabel** — oft nur Linux oder nur Windows
-- **Unwartbar** — Python-Skripte ohne Tests, ohne CI, ohne Dokumentation
+- **Pflegestand** — viele ruhen seit Monaten oder Jahren. Ein Werkzeug, das ich
+  täglich benutze, muss OS-Updates überleben.
+- **Plattformbindung** — häufig nur Linux oder nur Windows; ich brauche beides.
+- **Tragfähigkeit** — Skripte ohne Tests und CI sind schnell gebaut, aber schwer
+  über Jahre zu pflegen. Das ist eine Anforderung an mich selbst, keine Wertung
+  fremder Arbeit.
 
 ### Die Lösung: Murmel
 
@@ -110,9 +114,15 @@ Handy ist die **einzige Codebase**, die einen soliden, modularen Rust-Core für 
 ### Was noch offen ist
 
 - **React-Frontend** — steht noch (siehe §4.2 für die ehrliche Einordnung)
-- **Updater-Signaturschlüssel** — noch der öffentliche Schlüssel des Upstreams;
-  vor dem ersten Release durch ein eigenes Schlüsselpaar ersetzen
 - **macOS** — läuft technisch weiter mit, ist aber kein Zielsystem und wird nicht getestet
+
+### Erledigt
+
+- **Updater-Signaturschlüssel** — eigenes Paar seit 0.10.0; der private Teil liegt
+  ausserhalb des Repos und im GitHub-Secret `TAURI_SIGNING_PRIVATE_KEY`
+- **Code-Signing-Zertifikat** — bewusst nicht angeschafft. Der SmartScreen-Hinweis
+  beim ersten Start ist der akzeptierte Preis; die Update-Integrität hängt am
+  Signaturschlüssel, nicht am Zertifikat.
 
 ---
 
@@ -562,12 +572,15 @@ Erst angehen, wenn Windows und Ubuntu wirklich rundlaufen.
 | **nerd-dictation**       | `github.com/ideasman42/nerd-dictation` | GPL v3.0 | ~500                    |
 | **Speech Note (dsnote)** | `github.com/mkiol/dsnote`              | MPL 2.0  | ~2.000                  |
 
-### Abandoned Clones (nicht nutzbar)
+### Weitere angesehene Projekte
 
-| Projekt               | Repo                                 | Letzter Commit |
-| --------------------- | ------------------------------------ | -------------- |
-| **whisper-writer**    | `github.com/savbell/whisper-writer`  | August 2024    |
-| **whisper-dictation** | `github.com/foges/whisper-dictation` | Juni 2024      |
+Zum Zeitpunkt der Fork-Entscheidung länger ohne neue Commits — als Ideengeber
+trotzdem lesenswert:
+
+| Projekt               | Repo                                 | Letzter Commit (Stand Aug 2026) |
+| --------------------- | ------------------------------------ | ------------------------------- |
+| **whisper-writer**    | `github.com/savbell/whisper-writer`  | August 2024                     |
+| **whisper-dictation** | `github.com/foges/whisper-dictation` | Juni 2024                       |
 
 ### Technologien
 
