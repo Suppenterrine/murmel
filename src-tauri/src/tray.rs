@@ -93,13 +93,23 @@ fn windows_taskbar_theme() -> Option<AppTheme> {
     })
 }
 
-/// Gets the appropriate icon path for the given theme and state.
+/// The tray icon, which does not change while Murmel is used.
 ///
-/// `warning` overlays a badge on the idle icon while keyboard shortcuts are
-/// blocked (macOS Secure Input); recording/transcribing states keep their
-/// normal icons so in-flight activity stays recognizable.
-pub fn get_icon_path(theme: AppTheme, state: TrayIconState, warning: bool) -> &'static str {
-    if warning && state == TrayIconState::Idle {
+/// Upstream swapped it per state (idle → recording → transcribing). Murmel does
+/// not: a notification-area icon is an anchor, and one that keeps changing
+/// draws the eye to a corner of the screen where nothing needs deciding. What
+/// is happening is already shown where the user is looking — the overlay sits
+/// at the cursor and says "Transkribiere …" or "Veredele …".
+///
+/// The only variation left is which artwork survives the background it sits on:
+/// a light marble on a dark taskbar, a dark one on a light taskbar. That
+/// follows the *system* theme and changes only when Windows does.
+///
+/// `warning` swaps in a badged version while keyboard shortcuts are blocked
+/// (macOS Secure Input) — a state the user must notice, since the app appears
+/// dead otherwise.
+pub fn get_icon_path(theme: AppTheme, warning: bool) -> &'static str {
+    if warning {
         return match theme {
             AppTheme::Dark => "resources/tray_idle_warning.png",
             AppTheme::Light => "resources/tray_idle_warning_dark.png",
@@ -108,33 +118,40 @@ pub fn get_icon_path(theme: AppTheme, state: TrayIconState, warning: bool) -> &'
             AppTheme::Colored => "resources/murmel.png",
         };
     }
-    match (theme, state) {
-        // Dark theme uses light icons
-        (AppTheme::Dark, TrayIconState::Idle) => "resources/tray_idle.png",
-        (AppTheme::Dark, TrayIconState::Recording) => "resources/tray_recording.png",
-        (AppTheme::Dark, TrayIconState::Transcribing) => "resources/tray_transcribing.png",
-        // Light theme uses dark icons
-        (AppTheme::Light, TrayIconState::Idle) => "resources/tray_idle_dark.png",
-        (AppTheme::Light, TrayIconState::Recording) => "resources/tray_recording_dark.png",
-        (AppTheme::Light, TrayIconState::Transcribing) => "resources/tray_transcribing_dark.png",
-        // Colored theme uses pink icons (for Linux)
-        (AppTheme::Colored, TrayIconState::Idle) => "resources/murmel.png",
-        (AppTheme::Colored, TrayIconState::Recording) => "resources/recording.png",
-        (AppTheme::Colored, TrayIconState::Transcribing) => "resources/transcribing.png",
+
+    match theme {
+        // A dark taskbar needs the light marble, and vice versa.
+        AppTheme::Dark => "resources/tray_idle.png",
+        AppTheme::Light => "resources/tray_idle_dark.png",
+        AppTheme::Colored => "resources/murmel.png",
     }
 }
 
+/// Records what Murmel is doing and updates the tray *menu* accordingly.
+///
+/// The image is deliberately left alone: the state decides which menu entries
+/// make sense (a running recording can be cancelled, an idle one cannot), not
+/// what the icon looks like. See [`get_icon_path`].
 pub fn change_tray_icon(app: &AppHandle, icon: TrayIconState) {
-    let tray = app.state::<TrayIcon>();
-    let theme = get_current_theme(app);
-
-    // Store current state
     app.state::<CurrentTrayIconState>().set(icon);
 
-    let warning = crate::secure_input::tray_warning_active(app);
-    let icon_path = get_icon_path(theme, icon, warning);
+    let menu_started = std::time::Instant::now();
+    update_tray_menu(app, None);
+    debug!(
+        "tray state change ({:?}): menu={:?}",
+        icon,
+        menu_started.elapsed()
+    );
+}
 
-    let icon_started = std::time::Instant::now();
+/// Redraws the tray icon — after a theme change, or when the Secure Input
+/// warning appears or clears. Nothing else alters the image.
+pub fn refresh_tray_icon(app: &AppHandle) {
+    let tray = app.state::<TrayIcon>();
+    let theme = get_current_theme(app);
+    let warning = crate::secure_input::tray_warning_active(app);
+    let icon_path = get_icon_path(theme, warning);
+
     if let Err(err) = load_tray_icon(
         app.path()
             .resolve(icon_path, tauri::path::BaseDirectory::Resource),
@@ -143,25 +160,6 @@ pub fn change_tray_icon(app: &AppHandle, icon: TrayIconState) {
     {
         error!("Failed to update tray icon '{icon_path}': {err}");
     }
-    let icon_elapsed = icon_started.elapsed();
-
-    // Update menu based on state
-    let menu_started = std::time::Instant::now();
-    update_tray_menu(app, None);
-    debug!(
-        "tray icon change ({:?}): icon={} set_icon={:?} menu={:?}",
-        icon,
-        icon_path,
-        icon_elapsed,
-        menu_started.elapsed()
-    );
-}
-
-/// Re-applies the last known tray state — for when only the *theme* changed
-/// and the state itself (idle/recording/transcribing) should be preserved.
-pub fn refresh_tray_icon(app: &AppHandle) {
-    let icon = app.state::<CurrentTrayIconState>().get();
-    change_tray_icon(app, icon);
 }
 
 fn load_tray_icon(resolved_icon_path: tauri::Result<PathBuf>) -> tauri::Result<Image<'static>> {
@@ -331,6 +329,11 @@ pub fn update_tray_menu(app: &AppHandle, locale: Option<&str>) {
 
     let tray = app.state::<TrayIcon>();
     let _ = tray.set_menu(Some(menu));
+    // Only macOS tints template icons; elsewhere the flag flattens the artwork.
+    // Re-asserting it here is what made the icon flip back after a recording:
+    // change_tray_icon sets the image without it, so the icon was briefly right
+    // until the next menu update turned it into a silhouette again.
+    #[cfg(target_os = "macos")]
     let _ = tray.set_icon_as_template(true);
     let _ = tray.set_tooltip(Some(tooltip));
 }

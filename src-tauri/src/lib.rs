@@ -242,11 +242,10 @@ fn initialize_core_logic(app_handle: &AppHandle) {
             let _ = app_handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
         }
     }
-    // Get the current theme to set the appropriate initial icon
+    // The icon depends only on the taskbar theme — it does not change while
+    // Murmel runs (see tray::get_icon_path).
     let initial_theme = tray::get_current_theme(app_handle);
-
-    // Choose the appropriate initial icon based on theme
-    let initial_icon_path = tray::get_icon_path(initial_theme, tray::TrayIconState::Idle, false);
+    let initial_icon_path = tray::get_icon_path(initial_theme, false);
 
     let mut tray_builder = TrayIconBuilder::new()
         .icon(
@@ -258,8 +257,19 @@ fn initialize_core_logic(app_handle: &AppHandle) {
             )
             .unwrap(),
         )
-        .tooltip(tray::tray_tooltip())
-        .icon_as_template(true);
+        .tooltip(tray::tray_tooltip());
+
+    // Template icons are a macOS concept: the menu bar discards the artwork's
+    // colours and tints its silhouette to match. Everywhere else that flag
+    // flattens the icon instead — on Windows the marble lost its interior
+    // drawing and turned into a solid shape with the band punched out of it,
+    // which read as an inverted, older-looking icon. Murmel already picks a
+    // light or dark icon from the taskbar theme (tray::get_icon_path), so
+    // nothing outside macOS needs the system to recolour anything.
+    #[cfg(target_os = "macos")]
+    {
+        tray_builder = tray_builder.icon_as_template(true);
+    }
 
     // Windows notification-area convention: left click opens the app, right click
     // shows the menu. Elsewhere (macOS menu bar, Linux) the menu stays on left click.
