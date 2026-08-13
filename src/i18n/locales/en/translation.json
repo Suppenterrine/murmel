@@ -209,7 +209,12 @@
       }
     },
     "models": {
-      "title": "Transcription Models",
+      "title": "Models",
+      "tabs": {
+        "transcription": "Transcription",
+        "refinement": "Refinement"
+      },
+      "refinementDescription": "Choose the language model that tidies up your dictations — on this machine via Ollama, or via OpenRouter.",
       "description": "Select a transcription model or download additional models. Different models offer varying levels of accuracy and speed.",
       "searchPlaceholder": "Search models by name…",
       "yourModels": "Downloaded Models",

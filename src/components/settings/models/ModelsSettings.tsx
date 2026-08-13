@@ -18,6 +18,7 @@ import {
   supportsLanguageCode,
 } from "@/lib/constants/languages.ts";
 import type { ModelInfo } from "@/bindings";
+import { RefinementModels } from "./RefinementModels";
 
 // check if model supports a language based on its supported_languages list
 const modelSupportsLanguage = (model: ModelInfo, langCode: string): boolean => {
@@ -30,7 +31,70 @@ const modelSupportsLanguage = (model: ModelInfo, langCode: string): boolean => {
 const isLegacyModel = (model: ModelInfo): boolean =>
   typeof model.source === "object" && "Url" in model.source;
 
+type ModelKind = "transcription" | "refinement";
+
+/**
+ * Both kinds of model under one roof.
+ *
+ * "I want a different model" leads here, whichever job the model does — that
+ * one is transcribing and the other refining is a distinction *within* the
+ * task, not a reason for two places in the app. It also gives the refinement
+ * catalogue the room it needs; it used to sit inside a settings row.
+ */
 export const ModelsSettings: React.FC = () => {
+  const { t } = useTranslation();
+  const [kind, setKind] = useState<ModelKind>("transcription");
+
+  return (
+    <div className="max-w-3xl w-full mx-auto space-y-4">
+      <div className="mb-4">
+        <h1 className="text-xl font-semibold mb-2">
+          {t("settings.models.title")}
+        </h1>
+      </div>
+
+      <div className="flex items-center gap-1 p-1 rounded-lg bg-mid-gray/10 w-fit">
+        <KindButton
+          active={kind === "transcription"}
+          onClick={() => setKind("transcription")}
+          label={t("settings.models.tabs.transcription")}
+        />
+        <KindButton
+          active={kind === "refinement"}
+          onClick={() => setKind("refinement")}
+          label={t("settings.models.tabs.refinement")}
+        />
+      </div>
+
+      {kind === "transcription" ? (
+        <TranscriptionModels />
+      ) : (
+        <RefinementModels />
+      )}
+    </div>
+  );
+};
+
+const KindButton: React.FC<{
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}> = ({ active, onClick, label }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={active}
+    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+      active
+        ? "bg-background text-text shadow-sm"
+        : "text-text/60 hover:text-text"
+    }`}
+  >
+    {label}
+  </button>
+);
+
+const TranscriptionModels: React.FC = () => {
   const { t } = useTranslation();
   const [switchingModelId, setSwitchingModelId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -227,24 +291,15 @@ export const ModelsSettings: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="max-w-3xl w-full mx-auto">
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-2 border-logo-primary border-t-transparent rounded-full animate-spin" />
-        </div>
+      <div className="flex items-center justify-center py-16">
+        <div className="w-8 h-8 border-2 border-logo-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-4">
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold mb-2">
-          {t("settings.models.title")}
-        </h1>
-        <p className="text-sm text-text/60">
-          {t("settings.models.description")}
-        </p>
-      </div>
+    <div className="space-y-4">
+      <p className="text-sm text-text/60">{t("settings.models.description")}</p>
 
       {/* Search bar — filter the catalog by name or description */}
       <div className="relative">

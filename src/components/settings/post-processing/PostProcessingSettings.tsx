@@ -15,7 +15,6 @@ import { ResetButton } from "../../ui/ResetButton";
 import { Input } from "../../ui/Input";
 
 import { EndpointStatusNotice } from "../PostProcessingSettingsApi/EndpointStatusNotice";
-import { ModelPicker } from "../PostProcessingSettingsApi/ModelPicker";
 import { ProviderSelect } from "../PostProcessingSettingsApi/ProviderSelect";
 import { BaseUrlField } from "../PostProcessingSettingsApi/BaseUrlField";
 import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
@@ -106,26 +105,10 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
         </>
       )}
 
-      {/* Ollama and OpenRouter get the browsable list; a custom endpoint keeps
-          the free-text field, because Murmel cannot know what it offers. */}
-      {!state.isAppleProvider && !state.isCustomProvider && (
-        <SettingContainer
-          title={t("settings.postProcessing.api.model.title")}
-          description={t(
-            "settings.postProcessing.api.model.descriptionDefault",
-          )}
-          descriptionMode="tooltip"
-          layout="stacked"
-          grouped={true}
-        >
-          <ModelPicker
-            activeProviderId={state.selectedProviderId}
-            activeModel={state.model}
-            onPick={state.handleModelPick}
-          />
-        </SettingContainer>
-      )}
-
+      {/* The model list lives under Models, next to the transcription models —
+          it needs the room, and "I want a different model" leads there
+          regardless of which job the model does. A custom endpoint keeps its
+          free-text field here, because Murmel cannot know what it offers. */}
       {!state.isAppleProvider && state.isCustomProvider && (
         <SettingContainer
           title={t("settings.postProcessing.api.model.title")}

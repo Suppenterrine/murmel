@@ -168,7 +168,12 @@
       "title": "{{model}}-Einstellungen"
     },
     "models": {
-      "title": "Transkriptionsmodelle",
+      "title": "Modelle",
+      "tabs": {
+        "transcription": "Transkription",
+        "refinement": "Nachbearbeitung"
+      },
+      "refinementDescription": "Wähle das Sprachmodell, das deine Diktate aufräumt. Auf diesem Rechner über Ollama oder über OpenRouter.",
       "description": "Wähle ein Transkriptionsmodell aus oder lade zusätzliche Modelle herunter. Verschiedene Modelle bieten unterschiedliche Genauigkeits- und Geschwindigkeitsstufen.",
       "deleteConfirm": "Bist du sicher, dass du {{modelName}} löschen möchtest? Du musst es erneut herunterladen, um es zu verwenden.",
       "deleteActiveConfirm": "{{modelName}} ist dein aktives Modell. Das Löschen stoppt Transkriptionen, bis du ein neues Modell auswählst. Bist du sicher?",
