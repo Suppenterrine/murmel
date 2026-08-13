@@ -23,11 +23,14 @@ export const Button: React.FC<ButtonProps> = ({
     "font-medium rounded-lg border focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
 
   const variantClasses = {
+    // Bewusst Tinte (`logo-primary`), nicht der Akzent: der Akzent ist für
+    // „läuft gerade" reserviert (Aufnahme, Auswahl). Auf jeder zweiten
+    // Schaltfläche verlöre er diese Bedeutung.
     // `text-on-logo-primary` statt `text-white`: die Primärfläche ist im
     // Hellmodus dunkel und im Dunkelmodus hell — weißer Text wäre dort
     // unlesbar. Das Token dreht sich mit.
     primary:
-      "text-on-logo-primary bg-background-ui border-background-ui hover:bg-background-ui/80 hover:border-background-ui/80 focus:ring-1 focus:ring-background-ui",
+      "text-on-logo-primary bg-logo-primary border-logo-primary hover:bg-logo-primary/80 hover:border-logo-primary/80 focus:ring-1 focus:ring-logo-primary",
     "primary-soft":
       "text-text bg-logo-primary/20 border-transparent hover:bg-logo-primary/30 focus:ring-1 focus:ring-logo-primary",
     secondary:

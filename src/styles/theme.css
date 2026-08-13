@@ -71,30 +71,54 @@
 
   /* Dezente Fläche für ausgewählte Einträge (Sidebar). Hebt sich allein durch
      Helligkeit ab, damit der normale Textton darauf lesbar bleibt. */
+  /* ── Die dritte Farbe: der Akzent ─────────────────────────────────────────
+     Signaturfarbe aus `gene` und von der Website. Sie ist bewusst KEIN
+     Dekorton: sie erscheint nur da, wo etwas gerade aktiv ist — Murmel nimmt
+     auf, oder ein Eintrag ist ausgewählt. Wird sie überall verteilt, verliert
+     sie genau die Signalwirkung, für die sie da ist.
+
+     Absichtlich NICHT im Bildzeichen: dort liegt die Tiefe im
+     Helligkeitskontrast, und ein rostroter Strich auf heller Kugel hat davon
+     zu wenig — die Murmel wirkte flacher, nicht plastischer. */
+  --accent: #c45c4a;
+  /* Auf dunklem Grund eine Spur aufgehellt, sonst sackt der Ton weg. */
+  --accent-on-dark: #d4705a;
+
+  /* Gegenfarbe für Text/Icons auf einer Akzentfläche. */
+  --color-on-accent: #fdfbf7;
+
+  /* Ausgewählter Eintrag: eine Spur Akzent in der Fläche, damit die Auswahl
+     denselben Ton trägt wie der Aufnahmezustand — aber so verdünnt, dass der
+     normale Textton darauf lesbar bleibt. */
   --light-color-surface-active: color-mix(
     in srgb,
-    var(--ink) 12%,
+    var(--accent) 16%,
     var(--paper)
   );
   --dark-color-surface-active: color-mix(
     in srgb,
-    var(--ink-on-dark) 14%,
+    var(--accent-on-dark) 22%,
     var(--ink-surface)
   );
 
   /* Semantic status colors. Bewusst NICHT monochrom: eine Warnung, die aussieht
-     wie normaler Text, ist keine Warnung. Beide Töne sind aber in dieselbe
-     warme Familie gezogen (gedecktes Ocker / Rost statt Signalgelb und -rot),
-     damit sie neben der Graustufen-Palette nicht wie Fremdkörper wirken. */
-  --light-color-warning: #a8701f;
-  --light-color-error: #b3452f;
-  --dark-color-warning: #d9a441;
-  --dark-color-error: #d4705a;
+     wie normaler Text, ist keine Warnung.
 
-  /* Aktive UI-Fläche (Slider-Füllung, Overlay-Verlauf). Früher das Logo-Pink;
-     jetzt schlicht die Tinte — im Dunkelmodus entsprechend die helle Tinte. */
-  --light-color-background-ui: var(--ink);
-  --dark-color-background-ui: var(--ink-on-dark);
+     ACHTUNG beim Ändern: Der Fehlerton muss vom Akzent (#c45c4a) klar
+     unterscheidbar bleiben. Vorher lag er mit #b3452f / #d4705a praktisch
+     darauf — „aktiv" und „kaputt" hätten gleich ausgesehen. Er ist deshalb
+     jetzt tiefer und gesättigter, weg vom Orange hin zu klarem Rot. */
+  --light-color-warning: #a8701f;
+  --light-color-error: #96231b;
+  --dark-color-warning: #d9a441;
+  --dark-color-error: #ef8a7a;
+
+  /* Aktive UI-Fläche: Schieberegler-Füllung und der Akzent des Aufnahme-
+     Overlays. Das ist der Ort des Akzents — hier läuft gerade etwas.
+     Nicht zu verwechseln mit --color-logo-primary, das die ruhigen Flächen
+     (Schaltflächen, Kennzeichnungen) in Tinte hält. */
+  --light-color-background-ui: var(--accent);
+  --dark-color-background-ui: var(--accent-on-dark);
 
   /* Tokens that do not change between light and dark */
   --color-text-stroke: var(--paper);

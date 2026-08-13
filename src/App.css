@@ -12,6 +12,8 @@
   --color-logo-fill: var(--color-logo-fill);
   --color-logo-stroke: var(--color-logo-stroke);
   --color-surface-active: var(--color-surface-active);
+  --color-accent: var(--color-background-ui);
+  --color-on-accent: var(--color-on-accent);
   --color-text-stroke: var(--color-text-stroke);
   --color-mid-gray: var(--color-mid-gray);
   --color-warning: var(--color-warning);
