@@ -564,6 +564,10 @@ impl ShortcutAction for TranscribeAction {
         let start_time = Instant::now();
         debug!("TranscribeAction::start called for binding: {}", binding_id);
 
+        // Which of the two dictation hotkeys was pressed decides what the
+        // overlay shows from here until the text is pasted.
+        crate::overlay::set_post_process_active(self.post_process);
+
         // Load model in the background
         let tm = app.state::<Arc<TranscriptionManager>>();
         let rm = app.state::<Arc<AudioRecordingManager>>();

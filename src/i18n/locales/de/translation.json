@@ -722,8 +722,8 @@
     }
   },
   "overlay": {
-    "transcribing": "Transkribiere...",
-    "processing": "Verarbeite..."
+    "transcribing": "Transkribiere …",
+    "processing": "Veredele …"
   },
   "whatsNew": {
     "title": "Neu in Murmel v{{version}}"

@@ -22,6 +22,10 @@ const RecordingOverlay: React.FC = () => {
   const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(false);
   const [state, setState] = useState<OverlayState>("recording");
+  // True when this dictation was started with the refinement hotkey. The two
+  // hotkeys look identical while speaking otherwise, and the difference only
+  // becomes visible at the very end — or never, if nothing is configured.
+  const [postProcess, setPostProcess] = useState(false);
   const [levels, setLevels] = useState<number[]>(Array(WAVE_BARS).fill(0));
   const [streamText, setStreamText] = useState<StreamTextEvent>({
     committed: "",
@@ -64,8 +68,13 @@ const RecordingOverlay: React.FC = () => {
         } catch {
           // Keep the previous/default placement if settings can't be read.
         }
-        const overlayState = event.payload as OverlayState;
+        const payload = event.payload as {
+          state: OverlayState;
+          post_process: boolean;
+        };
+        const overlayState = payload.state;
         setState(overlayState);
+        setPostProcess(payload.post_process);
         if (overlayState === "recording" || overlayState === "streaming") {
           setStreamText({ committed: "", tentative: "" });
         }
@@ -188,6 +197,23 @@ const RecordingOverlay: React.FC = () => {
     <div className="sbase">
       <div className="sbase-l">
         <span className="sdot" />
+        {/* Sits beside the dot so the difference between the two dictation
+            hotkeys is visible while speaking, not only once the text arrives.
+            Same symbol the sidebar uses for refinement. */}
+        {postProcess && (
+          <svg
+            className="spolish"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+          </svg>
+        )}
       </div>
       {waveform}
       <div className="sbase-r">

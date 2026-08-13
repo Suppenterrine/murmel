@@ -307,7 +307,19 @@
   display: flex;
   padding-left: 5px;
   align-items: center;
+  gap: 5px;
   justify-self: start;
+}
+
+/* Marks a dictation started with the refinement hotkey. Deliberately quiet —
+   it is a statement of fact next to the recording dot, not a second signal
+   competing with it for attention. */
+.spolish {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  color: var(--s-accent);
+  opacity: 0.75;
 }
 .sbase-r {
   display: flex;

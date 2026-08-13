@@ -478,6 +478,27 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
     }
 }
 
+/// Whether the dictation currently on screen was started with refinement.
+///
+/// Held here rather than passed through every call site: the flag is decided
+/// once when recording starts and has to survive until the last overlay update
+/// of that dictation. It matters *while speaking* — the two hotkeys are
+/// otherwise indistinguishable, and finding out only at the end (or not at all,
+/// when nothing is configured) is exactly the confusion this removes.
+static POST_PROCESS_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// Called when a dictation starts, with whichever hotkey triggered it.
+pub fn set_post_process_active(active: bool) {
+    POST_PROCESS_ACTIVE.store(active, Ordering::Relaxed);
+}
+
+/// What the overlay window is told on every state change.
+#[derive(Clone, serde::Serialize)]
+struct OverlayStatePayload<'a> {
+    state: &'a str,
+    post_process: bool,
+}
+
 fn show_overlay_state(app_handle: &AppHandle, state: &str) {
     // Whether the overlay shows at all is governed by overlay_style; position
     // only chooses Top vs Bottom placement. Checked here (off the main thread)
@@ -578,7 +599,13 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
             );
         }
 
-        let _ = overlay_window.emit("show-overlay", state);
+        let _ = overlay_window.emit(
+            "show-overlay",
+            OverlayStatePayload {
+                state,
+                post_process: POST_PROCESS_ACTIVE.load(Ordering::Relaxed),
+            },
+        );
     }
 }
 
