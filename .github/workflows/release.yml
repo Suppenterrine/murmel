@@ -85,3 +85,78 @@ jobs:
       # stale cached native lib can never be linked into a shipped artifact.
       no-cache: true
     secrets: inherit
+
+  # Publish the draft — but only once every build succeeded.
+  #
+  # The draft used to be released by hand. That step was meant as a check, but a
+  # check nobody performs is ceremony: the artifacts went out unexamined, and
+  # clicking through it daily trains you to click through it on the day it
+  # matters. What it was supposed to catch is something a machine checks better
+  # anyway.
+  #
+  # `needs` does the real work: if any build job fails, this job never runs and
+  # the release stays a draft — visible on GitHub, invisible to the updater,
+  # waiting for someone to look. Releasing regardless is the failure mode worth
+  # preventing: the updater reads `latest.json` from whatever is marked
+  # "latest", so a release missing the Windows entry would leave every
+  # installation unable to find an update, publicly and under your name.
+  publish-release:
+    needs: [create-release, publish-tauri]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      # Second line of defence: a job can report success without its artifact
+      # ever reaching the release. Murmel's target platforms are Windows and
+      # Ubuntu (Murmel_Northstar.md §1), so those two entries must exist —
+      # the ARM builds are a bonus and not worth blocking a release over.
+      - name: Verify the updater manifest covers the target platforms
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const releaseId = ${{ needs.create-release.outputs.release-id }};
+            const { data: assets } = await github.rest.repos.listReleaseAssets({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: releaseId,
+              per_page: 100,
+            });
+
+            const manifest = assets.find((asset) => asset.name === 'latest.json');
+            if (!manifest) {
+              throw new Error('latest.json is missing — the updater would have nothing to read.');
+            }
+
+            const response = await github.request(
+              'GET /repos/{owner}/{repo}/releases/assets/{asset_id}',
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                asset_id: manifest.id,
+                headers: { accept: 'application/octet-stream' },
+              },
+            );
+
+            const parsed = JSON.parse(Buffer.from(response.data).toString('utf8'));
+            const missing = ['windows-x86_64', 'linux-x86_64'].filter(
+              (platform) => !parsed.platforms?.[platform]?.url,
+            );
+
+            if (missing.length > 0) {
+              throw new Error(`latest.json has no entry for: ${missing.join(', ')}`);
+            }
+
+            core.info(`latest.json covers ${Object.keys(parsed.platforms).length} platform keys.`);
+
+      - name: Publish the release
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-release.outputs.release-id }},
+              draft: false,
+              make_latest: 'true',
+            });
+            core.info('Release published — installations will find it on their next check.');

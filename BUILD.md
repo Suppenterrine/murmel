@@ -168,11 +168,21 @@ easy to miss, and both fail _silently_ — the app simply never sees an update:
    package.json
    ```
 
-2. **Publish the draft.** The workflow deliberately creates a **draft** release
-   so the artifacts can be checked before anyone gets them. The updater asks
-   `releases/latest/download/latest.json`, and GitHub does not count drafts as
-   "latest". Until the draft is published, every installation keeps reporting
-   "up to date".
+2. **Nothing — publishing is automatic.** The workflow still creates a draft,
+   but a final job (`publish-release`) releases it once every build has
+   succeeded. It also verifies that `latest.json` carries entries for Windows
+   and Linux, because a job can report success without its artifact reaching
+   the release.
+
+   If any build fails, that job never runs and the release **stays a draft**:
+   visible on GitHub, invisible to the updater, waiting for someone to look.
+   That is deliberate — the updater reads `latest.json` from whatever is marked
+   "latest", so publishing a release that is missing the Windows entry would
+   leave every installation unable to find an update.
+
+   The manual step it replaced was meant as a review of the artifacts. In
+   practice nobody reviewed them, and a check performed by reflex is not a
+   check — the machine does that part better.
 
 3. **Write the release note before building.** The "What's New" window reads
    `src/content/release-notes/<version>.md`, bundled into the frontend at build
