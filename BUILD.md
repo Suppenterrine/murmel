@@ -47,10 +47,16 @@ ORT_LIB_LOCATION=$(brew --prefix onnxruntime)/lib ORT_PREFER_DYNAMIC_LINK=1 bun 
   and `glslc`):
 
   ```powershell
-  winget install KhronosGroup.VulkanSDK
+  winget install KhronosGroup.VulkanSDK --accept-package-agreements --accept-source-agreements
   ```
 
   Open a new terminal afterward so `VULKAN_SDK` is set.
+
+  Murmel additionally pins the SDK path in [`.cargo/config.toml`](.cargo/config.toml)
+  under `[env]`, so the build does not depend on which variables a given shell
+  happens to have. Cargo does not override an already-set environment variable,
+  so the global one (which the installer sets) still wins — **update the path in
+  that file when you upgrade the SDK**, or the pinned value goes stale.
 
 > [!NOTE]
 > Windows' 260-character path limit used to break the native Vulkan build in
@@ -145,6 +151,59 @@ sudo cp -a src-tauri/transcribe-libs/. /usr/lib/Murmel/
 Resources only need re-copying if they change upstream (new icons, sounds, models, etc.).
 
 ## Troubleshooting
+
+### Windows: `Cannot restore timestamp ... generate.stamp: Zugriff verweigert`
+
+Symptom — the native build dies partway through `transcribe-cpp-sys`, usually
+naming a couple of CPU-variant projects:
+
+```
+CUSTOMBUILD : CMake error : Cannot restore timestamp
+".../ggml/src/CMakeFiles/generate.stamp": Zugriff verweigert
+  [ggml-cpu-sandybridge-feats.vcxproj]
+  [ggml-cpu-sse42-feats.vcxproj]
+```
+
+followed a few lines later by the misleading
+
+```
+CMake Error at .../CMakePackageConfigHelpers.cmake:519 (configure_file):
+  No such file or directory
+-- Configuring incomplete, errors occurred!
+```
+
+**Ignore the second error — it is only a consequence of the first.** The real
+cause: `GGML_CPU_ALL_VARIANTS=ON` builds many CPU variants in parallel
+(`--parallel 16`). If CMake decides it has to _re-configure_ mid-build, all
+those projects hit the same `generate.stamp` at once and Windows denies the
+concurrent access.
+
+**What triggers the re-configure: mixing build commands.** `tauri dev` compiles
+with `--no-default-features`, which is a _different_ build from a plain
+`cargo build` — different feature hash, different `OUT_DIR`, its own native
+build tree. Running `cargo build` first therefore warms nothing up; it only
+leaves behind a finished CMake tree that the next `tauri dev` trips over.
+
+**Fix — do not pre-build, and clear the broken tree:**
+
+```bash
+# 1. Drop the short NTFS junction (rmdir removes only the link, never the target)
+cmd //c rmdir "%LOCALAPPDATA%\tcs\<hash>"
+
+# 2. Drop the half-configured build dir
+rm -rf src-tauri/target/debug/build/transcribe-cpp-sys-<hash>
+
+# 3. Let tauri build it from scratch, on its own
+bun run tauri dev
+```
+
+Find `<hash>` by matching the junction in `%LOCALAPPDATA%\tcs\` to the
+`transcribe-cpp-sys-*` directory it points at.
+
+**Rule of thumb: run `bun run tauri dev` on its own.** Do not precede it with
+`cargo build`/`cargo check` on the same checkout. If the collision ever shows up
+during normal development, cap the parallelism in `.cargo/config.toml`
+(`[build] jobs = 4`) — cmake derives `--parallel` from cargo's `NUM_JOBS`.
 
 ### AppImage build fails on Arch / rolling-release distros
 

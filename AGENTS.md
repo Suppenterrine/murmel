@@ -215,6 +215,9 @@ Murmel is a personal fork of [Handy](https://github.com/cjpais/Handy) (MIT, © C
 **Never rename these** — they are external and unrelated to the Handy→Murmel rebrand:
 
 - `handy-keys` / `handy_keys` / `HandyKeys` — the crates.io keyboard-hotkey package and its bindings
+- `to_handy_string()` — a method on that crate's `Hotkey` type. Renaming it breaks the
+  build; the macOS caller in `secure_input.rs` does not even compile on Windows, so
+  a Windows-only check will not catch it.
 - `blob.handy.computer` — the CDN the model catalog downloads from
 - `handy-computer/*` — the Hugging Face organisation hosting the GGUF models
 - `github.com/cjpais/{vad-rs,rodio,tao,hf-hub}` — real upstream git dependencies

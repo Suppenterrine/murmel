@@ -1,1 +1,16 @@
 [build]
+
+# Build-Umgebung für den nativen Teil (transcribe-cpp / ggml).
+#
+# Diese Werte gelten NUR beim Kompilieren — die fertige App liest sie nie.
+# Sie stehen hier im Projekt, damit der Build nicht davon abhängt, welche
+# Variablen in der jeweiligen Shell zufällig gesetzt sind.
+#
+# Cargo überschreibt eine bereits gesetzte Umgebungsvariable hier bewusst NICHT.
+# Wer das SDK aktualisiert, kann die globale Variable setzen (der LunarG-Installer
+# tut das ohnehin) — sie gewinnt dann gegen diesen Eintrag.
+[env]
+# Vulkan SDK: liefert die Header und den Shader-Compiler `glslc`, die ggml für
+# den GPU-Backend-Build braucht. Installiert über:
+#   winget install KhronosGroup.VulkanSDK
+VULKAN_SDK = 'C:\VulkanSDK\1.4.357.0'

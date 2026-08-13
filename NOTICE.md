@@ -37,6 +37,7 @@ nicht mit umbenannt werden:
 | Bezeichner                                    | Was es ist                                             |
 | --------------------------------------------- | ------------------------------------------------------ |
 | `handy-keys`, `handy_keys`, `HandyKeys`       | Paket von crates.io für globale Hotkeys                |
+| `to_handy_string()`                           | Methode auf dem `Hotkey`-Typ dieses Pakets             |
 | `blob.handy.computer`                         | CDN, von dem der Modellkatalog die Modelle lädt        |
 | `handy-computer/*`                            | Hugging-Face-Organisation, die die GGUF-Modelle hostet |
 | `github.com/cjpais/{vad-rs,rodio,tao,hf-hub}` | Echte Git-Dependencies (Forks von CJ Pais)             |

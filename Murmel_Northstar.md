@@ -152,14 +152,26 @@ Werkzeug zu kommen.
 **Falls doch ein Rewrite:** Vanilla HTML/JS/CSS über die Tauri-API. Leptos
 (Rust→WASM) wäre die puristische Variante, kauft aber eine zweite Lernkurve ein.
 
-### 4.3 STT-Engine: Whisper.cpp + Parakeet V3
+### 4.3 STT-Engine: zwei Pfade, Modellwahl noch offen
 
-| Modell                           | Nutzung          | Vor- / Nachteil                                       |
-| -------------------------------- | ---------------- | ----------------------------------------------------- |
-| **Whisper (Small/Medium/Large)** | GPU-beschleunigt | Sehr genau, braucht VRAM                              |
-| **Parakeet V3**                  | CPU-only         | Schnell, automatische Spracherkennung, kein GPU nötig |
+Murmel bringt zwei unabhängige Inferenz-Pfade mit. Das ist eine Architektur-, keine
+Modellentscheidung:
 
-**Default:** Parakeet V3 (CPU-only, ~5x Echtzeit auf i5). Optional Whisper für maximale Genauigkeit auf Systemen mit GPU.
+| Pfad                | Bibliothek       | Format    | GPU                         |
+| ------------------- | ---------------- | --------- | --------------------------- |
+| **Whisper-Familie** | `transcribe-cpp` | GGML/GGUF | ja (Vulkan/Metal), optional |
+| **ONNX-Modelle**    | `transcribe-rs`  | ONNX      | nein, CPU                   |
+
+Der Modellkatalog (`src-tauri/src/catalog/catalog.json`) enthält aktuell **67 Modelle**
+— Whisper in mehreren Größen, Parakeet, Canary, Moonshine, SenseVoice, GigaAM und
+andere. Sie werden **zur Laufzeit in der App** heruntergeladen und umgeschaltet;
+nichts davon ist im Code festverdrahtet.
+
+> **Offene Entscheidung:** Welches Modell der Default wird, ist noch nicht
+> festgelegt und lässt sich sinnvoll erst nach eigenem Ausprobieren beantworten —
+> die Kriterien (deutsche Erkennungsqualität, Latenz auf der eigenen Hardware,
+> Speicherbedarf) sind maschinenabhängig. Bis dahin gilt: **selbst vergleichen,
+> dann entscheiden.**
 
 ### 4.4 Audio-Pipeline
 
@@ -329,6 +341,35 @@ gdbus call --session --dest org.murmel.app --object-path /org/murmel/app --metho
 
 Die Text-Injection-Logik aus Handy (`enigo` als Fallback, `xdotool`/`ydotool` als Primary) wird übernommen und an Murmel angepasst.
 
+#### Windows-Zwischenablageverlauf (Win+V) — bewusste Abwägung
+
+Standardmäßig fügt Murmel den Text ein und **stellt die vorherige Zwischenablage
+sofort wieder her**. Das ist spurlos, hat aber eine Folge: Das Diktat taucht nicht
+im Windows-Zwischenablageverlauf (`Win+V`) auf, weil es dort nie lange genug liegt.
+
+Für Murmel ist stattdessen **„In Zwischenablage kopieren"** gesetzt
+(`ClipboardHandling::CopyToClipboard`, Einstellungen → Erweitert). Der fertige
+Text bleibt danach in der Zwischenablage und wird von Windows in den Verlauf
+aufgenommen — so wie man es von WisprFlow kennt.
+
+**Was das kostet, offen benannt:** Damit liegt jedes Diktat in einem Speicher, den
+Windows verwaltet und nicht Murmel. Die Northstar-Regel „kein Byte verlässt den
+Rechner" gilt weiterhin — Murmel sendet nichts. „Nichts bleibt liegen" gilt aber
+nicht mehr. Zwei Konsequenzen:
+
+- **Cloud-Zwischenablage muss aus bleiben.** Ist die Synchronisierung des Verlaufs
+  aktiviert, schickt _Windows_ die Texte an Microsoft — an Murmel vorbei. Der
+  Registry-Wert `HKCU\Software\Microsoft\Clipboard\CloudClipboardAutomaticUpload`
+  gehört auf 0 bzw. ungesetzt.
+- **Der Verlauf ist eine bewusste Nutzerentscheidung**, kein Default. Wer heikle
+  Inhalte diktiert, stellt auf „Zwischenablage nicht ändern" zurück.
+
+Interessant für später: Für den optionalen „reliable paste"-Pfad markiert Murmel
+die _flüchtige_ Zwischenablage bereits mit den Windows-Opt-out-Formaten
+(`CanIncludeInClipboardHistory=0`, `CanUploadToCloudClipboard=0` — dieselben, die
+Chrome für Inkognito-Kopien nutzt). Dieselbe Technik wäre der saubere Weg für einen
+späteren **„Privates Diktat"-Hotkey**, der bewusst nichts hinterlässt.
+
 ### 7.4 Overlay — Minimalistisch & Verschiebbar
 
 WisprFlow's Overlay ist nicht verschiebbar — das ist nervig.
@@ -475,7 +516,7 @@ Erst angehen, wenn Windows und Ubuntu wirklich rundlaufen.
 
 - [ ] Build und Start auf Windows verifizieren
 - [ ] Hotkeys einrichten (Diktat + Diktat-mit-Nachbearbeitung)
-- [ ] Parakeet V3 als Default-Modell setzen
+- [ ] Mehrere Modelle im Alltag vergleichen (deutsche Qualität, Latenz, RAM) und **dann** einen Default festlegen
 - [ ] Startzeit und Transkriptionsgeschwindigkeit messen (Baseline)
 - [ ] Eigenen Updater-Signaturschlüssel erzeugen
 
