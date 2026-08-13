@@ -29,7 +29,11 @@ export const ReleaseNotesArchive: React.FC<ReleaseNotesArchiveProps> = ({
 
   return (
     <>
-      <ul className="flex flex-col">
+      {/* Capped at roughly six entries, then scrolls.
+          The list only grows: every release adds a row, and without a ceiling
+          the Info page would get taller forever while the interesting entries
+          — the recent ones — stay at the top anyway. */}
+      <ul className="flex flex-col max-h-64 overflow-y-auto pe-1">
         {notes.map((note) => (
           <li key={note.version}>
             <button
