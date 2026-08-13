@@ -409,7 +409,9 @@
           "checking": "Lokaler Dienst wird geprüft …",
           "reachable_one": "Lokaler Dienst läuft, 1 Modell verfügbar.",
           "reachable_other": "Lokaler Dienst läuft, {{count}} Modelle verfügbar.",
-          "unreachable": "Lokaler Dienst nicht erreichbar. Die Nachbearbeitung wird übersprungen und das Rohtranskript eingefügt. Läuft Ollama?"
+          "unreachable": "Lokaler Dienst nicht erreichbar. Die Nachbearbeitung wird übersprungen und das Rohtranskript eingefügt.",
+          "start": "Ollama starten",
+          "starting": "Wird gestartet …"
         },
         "baseUrl": {
           "title": "Basis-URL",

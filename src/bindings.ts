@@ -272,6 +272,14 @@ async searchHistoryEntries(query: string | null, onlySaved: boolean, limit: numb
     else return { status: "error", error: e  as any };
 }
 },
+async startLocalLlmService(providerId: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_local_llm_service", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async checkPostProcessEndpoint(providerId: string) : Promise<Result<EndpointStatus, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("check_post_process_endpoint", { providerId }) };

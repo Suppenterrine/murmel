@@ -1283,6 +1283,57 @@ pub async fn check_post_process_endpoint(
     )
 }
 
+/// Is the provider's endpoint answering?
+async fn endpoint_responds(settings: &settings::AppSettings, provider_id: &str) -> bool {
+    let Some(provider) = settings
+        .post_process_providers
+        .iter()
+        .find(|p| p.id == provider_id)
+    else {
+        return false;
+    };
+
+    let api_key = settings
+        .post_process_api_keys
+        .get(provider_id)
+        .cloned()
+        .unwrap_or_default();
+
+    crate::llm_client::fetch_models(provider, api_key)
+        .await
+        .is_ok()
+}
+
+/// Start the local language-model service and wait until it answers.
+///
+/// Refusing for remote providers is not pedantry: "start the service" has no
+/// meaning for an endpoint on someone else's machine, and silently doing
+/// nothing would look like a failed launch.
+#[tauri::command]
+#[specta::specta]
+pub async fn start_local_llm_service(app: AppHandle, provider_id: String) -> Result<(), String> {
+    let settings = settings::get_settings(&app);
+
+    let provider = settings
+        .post_process_providers
+        .iter()
+        .find(|p| p.id == provider_id)
+        .ok_or_else(|| format!("Provider '{}' not found", provider_id))?;
+
+    if !settings::is_local_endpoint(&provider.base_url) {
+        return Err("This provider does not run on this machine.".to_string());
+    }
+
+    let settings_for_check = settings.clone();
+    let provider_for_check = provider_id.clone();
+    crate::local_llm::start_and_wait(move || {
+        let settings = settings_for_check.clone();
+        let provider_id = provider_for_check.clone();
+        async move { endpoint_responds(&settings, &provider_id).await }
+    })
+    .await
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn set_post_process_selected_prompt(app: AppHandle, id: String) -> Result<(), String> {

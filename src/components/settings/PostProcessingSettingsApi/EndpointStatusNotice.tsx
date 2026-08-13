@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { commands, type EndpointStatus } from "@/bindings";
 import { Alert } from "../../ui/Alert";
+import { Button } from "../../ui/Button";
 
 type EndpointStatusNoticeProps = {
   providerId: string;
@@ -26,6 +27,8 @@ export const EndpointStatusNotice: React.FC<EndpointStatusNoticeProps> = ({
   const { t } = useTranslation();
   const [status, setStatus] = useState<EndpointStatus | null>(null);
   const [isChecking, setIsChecking] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   const check = useCallback(async () => {
     if (!providerId) return;
@@ -46,6 +49,23 @@ export const EndpointStatusNotice: React.FC<EndpointStatusNoticeProps> = ({
     void check();
   }, [check, baseUrl]);
 
+  const startService = useCallback(async () => {
+    setIsStarting(true);
+    setStartError(null);
+    try {
+      const result = await commands.startLocalLlmService(providerId);
+      if (result.status === "ok") {
+        await check();
+      } else {
+        setStartError(String(result.error));
+      }
+    } catch (error) {
+      setStartError(String(error));
+    } finally {
+      setIsStarting(false);
+    }
+  }, [providerId, check]);
+
   if (!status) return null;
 
   if (!status.is_local) {
@@ -60,11 +80,23 @@ export const EndpointStatusNotice: React.FC<EndpointStatusNoticeProps> = ({
     return (
       <Alert variant="error" contained>
         {t("settings.postProcessing.api.endpoint.unreachable")}
-        {status.error ? (
+        {startError ? (
           <span className="block mt-1 font-mono text-xs opacity-70">
-            {status.error}
+            {startError}
           </span>
         ) : null}
+        <div className="mt-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={startService}
+            disabled={isStarting}
+          >
+            {isStarting
+              ? t("settings.postProcessing.api.endpoint.starting")
+              : t("settings.postProcessing.api.endpoint.start")}
+          </Button>
+        </div>
       </Alert>
     );
   }

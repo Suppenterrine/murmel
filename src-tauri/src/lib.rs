@@ -11,6 +11,7 @@ mod commands;
 mod helpers;
 mod input;
 mod llm_client;
+mod local_llm;
 mod managers;
 mod memory;
 mod overlay;
@@ -146,6 +147,42 @@ fn should_force_show_permissions_window(app: &AppHandle) -> bool {
     false
 }
 
+/// Bring the local language-model service up in the background at launch.
+///
+/// Gated on refinement actually being enabled and pointing at this machine, so
+/// nobody gets an Ollama process (and its memory) started for a feature they do
+/// not use.
+///
+/// Doing this at launch rather than before the first refinement is deliberate:
+/// starting the service and loading a model takes seconds, and paying that on
+/// the first dictation would be felt exactly when speed matters. Failures are
+/// only logged — Murmel dictates fine without refinement, and the settings
+/// screen shows the state along with a button to retry.
+fn start_local_llm_if_configured(app_handle: &AppHandle) {
+    let settings = settings::get_settings(app_handle);
+
+    if !settings.post_process_enabled || !settings.auto_start_local_llm {
+        return;
+    }
+
+    let Some(provider) = settings.active_post_process_provider().cloned() else {
+        return;
+    };
+
+    if !settings::is_local_endpoint(&provider.base_url) {
+        return;
+    }
+
+    let app = app_handle.clone();
+    let provider_id = provider.id.clone();
+    tauri::async_runtime::spawn(async move {
+        match shortcut::start_local_llm_service(app, provider_id).await {
+            Ok(()) => log::debug!("Local LLM service ready"),
+            Err(err) => log::debug!("Local LLM service not started: {}", err),
+        }
+    });
+}
+
 fn initialize_core_logic(app_handle: &AppHandle) {
     // Note: Enigo (keyboard/mouse simulation) is NOT initialized here.
     // The frontend is responsible for calling the `initialize_enigo` command
@@ -181,6 +218,8 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
     app_handle.manage(tray::CurrentTrayIconState::new());
+
+    start_local_llm_if_configured(app_handle);
 
     // Note: Shortcuts are NOT initialized here.
     // The frontend is responsible for calling the `initialize_shortcuts` command
@@ -636,6 +675,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::set_post_process_provider,
             shortcut::fetch_post_process_models,
             shortcut::check_post_process_endpoint,
+            shortcut::start_local_llm_service,
             shortcut::add_post_process_prompt,
             shortcut::update_post_process_prompt,
             shortcut::delete_post_process_prompt,

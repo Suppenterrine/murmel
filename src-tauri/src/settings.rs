@@ -429,6 +429,14 @@ pub struct AppSettings {
     /// `post_process_prompts`. See `ensure_post_process_defaults`.
     #[serde(default)]
     pub post_process_presets_version: u32,
+    /// Start the local language-model service on launch when refinement is
+    /// enabled and points at this machine.
+    ///
+    /// On by default, because the alternative is worse than it looks: a stopped
+    /// Ollama does not produce an error, it produces dictations that silently
+    /// arrive unrefined.
+    #[serde(default = "default_auto_start_local_llm")]
+    pub auto_start_local_llm: bool,
     #[serde(default)]
     pub post_process_selected_prompt_id: Option<String>,
     #[serde(default)]
@@ -608,6 +616,10 @@ fn default_app_language() -> String {
 }
 
 fn default_show_tray_icon() -> bool {
+    true
+}
+
+fn default_auto_start_local_llm() -> bool {
     true
 }
 
@@ -1016,6 +1028,7 @@ pub fn get_default_settings() -> AppSettings {
         post_process_models: default_post_process_models(),
         post_process_prompts: default_post_process_prompts(),
         post_process_presets_version: POST_PROCESS_PRESETS_VERSION,
+        auto_start_local_llm: default_auto_start_local_llm(),
         post_process_selected_prompt_id: None,
         mute_while_recording: false,
         append_trailing_space: false,
