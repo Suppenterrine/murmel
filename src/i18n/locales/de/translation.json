@@ -9,7 +9,16 @@
     "cancel": "Abbrechen",
     "secureInputWarning": "⚠ Tastenkürzel durch Secure Input blockiert"
   },
+  "home": {
+    "headline": "Sprechen statt tippen",
+    "lead": "Murmel wandelt deine Stimme in Text um — überall dort, wo der Cursor gerade steht.",
+    "how": "Taste drücken, sprechen, loslassen. Der Text erscheint da, wo du ohnehin schreiben wolltest: im Editor, im Chatfenster, in der Adresszeile. Kein Fenster, das sich dazwischenschiebt, kein Kopieren und Einfügen.",
+    "privacy": "Die Spracherkennung läuft <strong>vollständig auf diesem Rechner</strong>. Das Modell wird einmal heruntergeladen und arbeitet danach ohne Internet. Kein Konto, kein Abo, keine Aufnahme, die irgendwo auf einem fremden Server landet.",
+    "refinement": "Auf Wunsch räumt ein zweiter Tastendruck den Text gleich auf: Füllwörter raus, Interpunktion rein, auf Wunsch als E-Mail oder Notiz. Auch das geschieht lokal, sofern du ein Sprachmodell auf diesem Rechner nutzt.",
+    "motto": "Ich murmle, also bin ich."
+  },
   "sidebar": {
+    "home": "Start",
     "general": "Allgemein",
     "models": "Modelle",
     "advanced": "Erweitert",

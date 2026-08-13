@@ -1,10 +1,19 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Cog, FlaskConical, History, Info, Sparkles, Cpu } from "lucide-react";
+import {
+  Cog,
+  Cpu,
+  FlaskConical,
+  History,
+  Info,
+  SlidersHorizontal,
+  Sparkles,
+} from "lucide-react";
 import MurmelTextLogo from "./icons/MurmelTextLogo";
 import MurmelHand from "./icons/MurmelHand";
 import { useSettings } from "../hooks/useSettings";
 import {
+  HomeSettings,
   GeneralSettings,
   AdvancedSettings,
   HistorySettings,
@@ -32,9 +41,17 @@ interface SectionConfig {
 }
 
 export const SECTIONS_CONFIG = {
+  // Erster Eintrag und damit die Ansicht beim Öffnen. Die Bildmarke sitzt hier
+  // statt bei "Allgemein": Sie steht für die App, nicht für deren Einstellungen.
+  home: {
+    labelKey: "sidebar.home",
+    icon: MurmelHand,
+    component: HomeSettings,
+    enabled: () => true,
+  },
   general: {
     labelKey: "sidebar.general",
-    icon: MurmelHand,
+    icon: SlidersHorizontal,
     component: GeneralSettings,
     enabled: () => true,
   },

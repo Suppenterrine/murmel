@@ -155,9 +155,17 @@ Werkzeug zu kommen.
 
 **Der gewählte Pfad — Reduktion statt Rewrite:**
 
-1. **Zuerst wegschneiden, was nicht gebraucht wird:** i18n auf Deutsch/Englisch
-   reduzieren, macOS-spezifische UI-Pfade entfernen, Onboarding auf das Nötigste
-   eindampfen. Das bringt den größten Effekt bei kleinstem Risiko.
+1. **Zuerst wegschneiden, was nicht gebraucht wird:** ~~i18n auf
+   Deutsch/Englisch reduzieren~~ (erledigt, 0.12.0), macOS-spezifische UI-Pfade
+   entfernen, Onboarding auf das Nötigste eindampfen. Das bringt den größten
+   Effekt bei kleinstem Risiko.
+
+   > **Warum die i18n-Reduktion zuerst kam:** Der CI-Prüfschritt vergleicht
+   > jede Sprache gegen die englische Referenz. Jeder neue UI-Text kostete
+   > damit 24 Einträge — 22 davon maschinell oder mit Englisch gefüllt, also
+   > Einträge, die niemand gegenlesen kann. Vor einer Reihe von UI-Arbeiten
+   > vervielfacht sich dieser Aufwand; danach kostet ein Text zwei Einträge.
+
 2. **Dann das Hauptfenster neu gestalten:** Historie als zentrale Ansicht (§7),
    Einstellungen dahinter aufgeräumt.
 3. **Rewrite nur, wenn er sich dann noch lohnt.** Wenn nach Schritt 1 und 2 ein
@@ -571,13 +579,22 @@ Erst angehen, wenn Windows und Ubuntu wirklich rundlaufen.
 
 ### Phase 2: Murmel wird Murmel
 
-- [ ] Lokales LLM (Ollama) als Default-Provider für die Nachbearbeitung
-- [ ] Prompt-Presets statt freiem Textfeld (§5.2)
-- [ ] Deutliche UI-Kennzeichnung, wenn ein Cloud-Provider aktiv ist
+- [x] Lokales LLM (Ollama) als Default-Provider für die Nachbearbeitung —
+      eigener Anbieter mit Erreichbarkeitsprüfung, nicht mehr als „Custom"
+      getarnt
+- [x] Prompt-Presets statt freiem Textfeld (§5.2)
+- [x] Deutliche UI-Kennzeichnung, wenn ein Cloud-Provider aktiv ist — als
+      lokal gilt nur Loopback, ein Ollama im Heimnetz wird als „verlässt den
+      Rechner" gekennzeichnet
 - [x] History-Migration um Metrik-Spalten erweitern (§6.2) — plus eigene
       Tabelle `post_process_runs` für die Veredelungsläufe (§9)
-- [ ] Insights-Ansicht: Wörter, Zeitersparnis, Modell-Performance (§6.3)
-- [ ] UI-Reduktion: i18n auf DE/EN, Onboarding eindampfen (§4.2)
+- [x] UI-Reduktion: i18n auf DE/EN (§4.2). Onboarding eindampfen steht noch aus
+- [ ] Insights-Ansicht: Wörter, Zeitersparnis, Modell-Performance (§6.3) —
+      wartet bewusst auf Nutzungsdaten, die sich seit 0.11.0 ansammeln
+- [ ] Startseite als eigener Tab: Bildmarke, kurzer Text, was die App tut
+- [ ] Release-Notes-Archiv in der App — repariert nebenbei, dass eine
+      übersprungene Version nie wieder sichtbar wird
+- [ ] Volltextsuche über die Historie (`fts5`) mit Favoriten-Umschalter
 
 ### Phase 3: Ubuntu 24.04
 
@@ -595,7 +612,6 @@ Erst angehen, wenn Windows und Ubuntu wirklich rundlaufen.
 
 ### Irgendwann, vielleicht
 
-- [ ] Volltextsuche über die Historie (`fts5`)
 - [ ] Sprachbefehle („Neuer Absatz", „Punkt", „Komma")
 - [ ] Export der Statistiken als JSON/CSV
 

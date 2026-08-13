@@ -9,7 +9,16 @@
     "cancel": "Cancel",
     "secureInputWarning": "⚠ Shortcuts blocked by Secure Input"
   },
+  "home": {
+    "headline": "Speak instead of typing",
+    "lead": "Murmel turns your voice into text — wherever the cursor happens to be.",
+    "how": "Press the key, speak, let go. The text appears where you meant to write anyway: in the editor, in the chat window, in the address bar. No window gets in the way, no copying and pasting.",
+    "privacy": "Speech recognition runs <strong>entirely on this machine</strong>. The model is downloaded once and works without internet afterwards. No account, no subscription, no recording that ends up on someone else's server.",
+    "refinement": "If you like, a second key tidies the text up as it goes: filler words out, punctuation in, phrased as an email or as notes. That too stays on this machine, as long as you use a language model running here.",
+    "motto": "I murmur, therefore I am."
+  },
   "sidebar": {
+    "home": "Home",
     "general": "General",
     "models": "Models",
     "advanced": "Advanced",

@@ -18,6 +18,23 @@
   --color-mid-gray: var(--color-mid-gray);
   --color-warning: var(--color-warning);
   --color-error: var(--color-error);
+
+  /* Fraunces steht sonst nur in der Wortmarke. Als Familie registriert, ist
+     sie auch für lesbaren Fließtext verfügbar — Startseite, Release-Notizen —
+     ohne dass jede Stelle den Fallback-Stapel wiederholt. Lokal gebündelt
+     über fontsource; Murmel lädt zur Laufzeit nichts nach. */
+  --font-display:
+    "Fraunces Variable", Fraunces, Georgia, "Times New Roman", serif;
+}
+
+/* Fraunces ist eine variable Schrift: `opsz` (optische Größe) entscheidet über
+   Strichkontrast. Für Fließtext niedrig halten — die hohen Werte der Wortmarke
+   machen längere Absätze unruhig. */
+.prose-display {
+  font-family: var(--font-display);
+  font-variation-settings:
+    "opsz" 14,
+    "SOFT" 20;
 }
 
 :root {

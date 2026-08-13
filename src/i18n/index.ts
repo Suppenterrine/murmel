@@ -68,7 +68,9 @@ export const getSupportedLanguage = (
   const language = normalized.split("-")[0];
 
   const supported =
-    SUPPORTED_LANGUAGES.find((lang) => lang.code.toLowerCase() === normalized) ??
+    SUPPORTED_LANGUAGES.find(
+      (lang) => lang.code.toLowerCase() === normalized,
+    ) ??
     SUPPORTED_LANGUAGES.find((lang) => lang.code.toLowerCase() === language);
 
   return supported ? supported.code : null;
