@@ -1,7 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Cloud, HardDrive, RefreshCw, Search } from "lucide-react";
+import {
+  Check,
+  Cloud,
+  Coins,
+  Cpu,
+  HardDrive,
+  Loader2,
+  RefreshCw,
+  Search,
+  Sparkles,
+} from "lucide-react";
 import { commands, type LocalModel, type RemoteModel } from "@/bindings";
+import Badge from "../../ui/Badge";
 import { OLLAMA_PROVIDER_ID, OPENROUTER_PROVIDER_ID } from "./types";
 
 type Source = "local" | "remote";
@@ -39,16 +50,13 @@ function costPerDictation(model: RemoteModel, words: number): number {
   );
 }
 
-function formatSize(bytes: number): string {
-  return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-}
-
 /**
  * The refinement model picker: one list per source, never both at once.
  *
  * Local and remote models answer different questions — "does it fit on this
- * machine" versus "what does it cost me" — so they get different columns and a
- * switch instead of a merged list with half-empty rows.
+ * machine" versus "what does it cost me" — so they get different footers and a
+ * switch instead of a merged list with half-empty rows. The card layout follows
+ * the transcription models page so both model screens read the same way.
  */
 export const ModelPicker: React.FC<ModelPickerProps> = ({
   activeProviderId,
@@ -116,74 +124,85 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     });
   }, [remoteModels, query, freeOnly]);
 
-  const isActive = (providerId: string, model: string) =>
-    activeProviderId === providerId && activeModel === model;
+  const isEmpty =
+    !loading &&
+    !error &&
+    (source === "local" ? visibleLocal : visibleRemote).length === 0;
 
   return (
-    <div className="space-y-3">
+    <div className="w-full space-y-4">
       {/* Source switch — the one decision that changes everything below it. */}
       <div className="flex items-center gap-1 p-1 rounded-lg bg-mid-gray/10 w-fit">
         <SourceButton
           active={source === "local"}
           onClick={() => setSource("local")}
           icon={<HardDrive className="w-3.5 h-3.5" />}
-          label={t("settings.postProcessing.models.local")}
+          label={t("settings.postProcessing.api.models.local")}
         />
         <SourceButton
           active={source === "remote"}
           onClick={() => setSource("remote")}
           icon={<Cloud className="w-3.5 h-3.5" />}
-          label={t("settings.postProcessing.models.remote")}
+          label={t("settings.postProcessing.api.models.remote")}
         />
       </div>
 
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text/40 pointer-events-none" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t("settings.postProcessing.models.searchPlaceholder")}
-            aria-label={t("settings.postProcessing.models.searchPlaceholder")}
-            className="w-full ps-9 pe-3 py-2 text-sm rounded-md bg-mid-gray/10 border border-mid-gray/40 text-text placeholder:text-text/40 focus:outline-none focus:border-logo-primary/50"
-          />
-        </div>
+      <div className="relative">
+        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text/40 pointer-events-none" />
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t(
+            "settings.postProcessing.api.models.searchPlaceholder",
+          )}
+          aria-label={t("settings.postProcessing.api.models.searchPlaceholder")}
+          className="w-full ps-9 pe-3 py-2 text-sm bg-mid-gray/10 border border-mid-gray/40 rounded-lg focus:outline-none focus:ring-1 focus:ring-logo-primary placeholder:text-text/40"
+        />
+      </div>
 
-        {source === "remote" && (
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-medium text-text/60">
+          {source === "local"
+            ? t("settings.postProcessing.api.models.installed")
+            : t("settings.postProcessing.api.models.available")}
+        </h3>
+
+        <div className="flex items-center gap-2">
+          {source === "remote" && (
+            <button
+              type="button"
+              onClick={() => setFreeOnly((on) => !on)}
+              aria-pressed={freeOnly}
+              title={t("settings.postProcessing.api.models.freeOnly")}
+              className={`h-8 px-3 text-sm font-medium rounded-lg transition-colors ${
+                freeOnly
+                  ? "bg-logo-primary/20 text-logo-primary hover:bg-logo-primary/30"
+                  : "bg-mid-gray/10 text-text/60 hover:bg-mid-gray/20"
+              }`}
+            >
+              {t("settings.postProcessing.api.models.freeOnly")}
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setFreeOnly((on) => !on)}
-            aria-pressed={freeOnly}
-            title={t("settings.postProcessing.models.freeOnly")}
-            className={`h-9 px-3 text-sm font-medium rounded-md transition-colors ${
-              freeOnly
-                ? "bg-logo-primary/20 text-logo-primary"
-                : "bg-mid-gray/10 text-text/60 hover:bg-mid-gray/20"
-            }`}
+            onClick={() => void load()}
+            disabled={loading}
+            title={t("settings.postProcessing.api.models.refresh")}
+            aria-label={t("settings.postProcessing.api.models.refresh")}
+            className="flex items-center justify-center w-8 h-8 rounded-lg bg-mid-gray/10 text-text/60 hover:bg-mid-gray/20 transition-colors disabled:opacity-50"
           >
-            {t("settings.postProcessing.models.freeOnly")}
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+            />
           </button>
-        )}
-
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          title={t("settings.postProcessing.models.refresh")}
-          aria-label={t("settings.postProcessing.models.refresh")}
-          className="flex items-center justify-center w-9 h-9 rounded-md bg-mid-gray/10 text-text/60 hover:bg-mid-gray/20 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw
-            className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
-          />
-        </button>
+        </div>
       </div>
 
       {error && (
         <p className="text-sm text-error">
           {source === "local"
-            ? t("settings.postProcessing.models.localUnavailable")
+            ? t("settings.postProcessing.api.models.localUnavailable")
             : error}
         </p>
       )}
@@ -191,60 +210,100 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       {source === "remote" && !error && (
         <p className="text-xs text-text/50">
           {averageWords === null
-            ? t("settings.postProcessing.models.costAssumed", {
+            ? t("settings.postProcessing.api.models.costAssumed", {
                 words: ASSUMED_WORDS,
               })
-            : t("settings.postProcessing.models.costMeasured", {
+            : t("settings.postProcessing.api.models.costMeasured", {
                 words: Math.round(averageWords),
               })}
         </p>
       )}
 
-      <div className="border border-mid-gray/20 rounded-lg divide-y divide-mid-gray/15 overflow-hidden">
-        {source === "local"
-          ? visibleLocal.map((model) => (
-              <ModelRow
-                key={model.name}
-                title={model.name}
-                detail={[
-                  formatSize(model.size_bytes),
-                  model.parameter_size,
-                  model.quantization,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-                active={isActive(OLLAMA_PROVIDER_ID, model.name)}
-                onSelect={() => onPick(OLLAMA_PROVIDER_ID, model.name)}
-                activeLabel={t("settings.postProcessing.models.active")}
-              />
-            ))
-          : visibleRemote.map((model) => (
-              <ModelRow
-                key={model.id}
-                title={model.name}
-                detail={[
-                  `${Math.round(model.context_length / 1000)}k`,
-                  model.is_free
-                    ? t("settings.postProcessing.models.free")
-                    : t("settings.postProcessing.models.perDictation", {
-                        cents: (costPerDictation(model, words) * 100).toFixed(
-                          3,
-                        ),
-                      }),
-                ].join(" · ")}
-                active={isActive(OPENROUTER_PROVIDER_ID, model.id)}
-                onSelect={() => onPick(OPENROUTER_PROVIDER_ID, model.id)}
-                activeLabel={t("settings.postProcessing.models.active")}
-              />
-            ))}
+      {loading && (
+        <div className="flex items-center justify-center py-10">
+          <Loader2 className="w-6 h-6 animate-spin text-text/40" />
+        </div>
+      )}
 
+      <div className="space-y-3">
         {!loading &&
-          (source === "local" ? visibleLocal : visibleRemote).length === 0 &&
-          !error && (
-            <p className="px-4 py-6 text-center text-sm text-text/50">
-              {t("settings.postProcessing.models.noMatches")}
-            </p>
-          )}
+          (source === "local"
+            ? visibleLocal.map((model) => (
+                <ModelCard
+                  key={model.name}
+                  title={model.name}
+                  subtitle={model.family ?? ""}
+                  active={
+                    activeProviderId === OLLAMA_PROVIDER_ID &&
+                    activeModel === model.name
+                  }
+                  activeLabel={t("settings.postProcessing.api.models.active")}
+                  onSelect={() => onPick(OLLAMA_PROVIDER_ID, model.name)}
+                  facts={[
+                    {
+                      icon: <HardDrive className="w-3.5 h-3.5" />,
+                      text: `${(model.size_bytes / 1024 ** 3).toFixed(1)} GB`,
+                    },
+                    model.parameter_size
+                      ? {
+                          icon: <Cpu className="w-3.5 h-3.5" />,
+                          text: model.parameter_size,
+                        }
+                      : null,
+                    model.quantization
+                      ? {
+                          icon: <Sparkles className="w-3.5 h-3.5" />,
+                          text: model.quantization,
+                        }
+                      : null,
+                  ]}
+                />
+              ))
+            : visibleRemote.map((model) => (
+                <ModelCard
+                  key={model.id}
+                  title={model.name}
+                  subtitle={model.id}
+                  active={
+                    activeProviderId === OPENROUTER_PROVIDER_ID &&
+                    activeModel === model.id
+                  }
+                  activeLabel={t("settings.postProcessing.api.models.active")}
+                  badge={
+                    model.is_free
+                      ? t("settings.postProcessing.api.models.free")
+                      : undefined
+                  }
+                  onSelect={() => onPick(OPENROUTER_PROVIDER_ID, model.id)}
+                  facts={[
+                    {
+                      icon: <Cpu className="w-3.5 h-3.5" />,
+                      text: t("settings.postProcessing.api.models.context", {
+                        thousands: Math.round(model.context_length / 1000),
+                      }),
+                    },
+                    model.is_free
+                      ? null
+                      : {
+                          icon: <Coins className="w-3.5 h-3.5" />,
+                          text: t(
+                            "settings.postProcessing.api.models.perDictation",
+                            {
+                              cents: (
+                                costPerDictation(model, words) * 100
+                              ).toFixed(3),
+                            },
+                          ),
+                        },
+                  ]}
+                />
+              )))}
+
+        {isEmpty && (
+          <div className="text-center py-8 text-text/50">
+            {t("settings.postProcessing.api.models.noMatches")}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -271,29 +330,55 @@ const SourceButton: React.FC<{
   </button>
 );
 
-const ModelRow: React.FC<{
+type Fact = { icon: React.ReactNode; text: string } | null;
+
+/**
+ * One model, laid out like the transcription model cards: name and state on
+ * top, the numbers that decide the choice along the bottom.
+ */
+const ModelCard: React.FC<{
   title: string;
-  detail: string;
+  subtitle: string;
+  facts: Fact[];
   active: boolean;
   activeLabel: string;
+  badge?: string;
   onSelect: () => void;
-}> = ({ title, detail, active, activeLabel, onSelect }) => (
+}> = ({ title, subtitle, facts, active, activeLabel, badge, onSelect }) => (
   <button
     type="button"
     onClick={onSelect}
-    className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors ${
-      active ? "bg-logo-primary/10" : "hover:bg-mid-gray/10"
+    className={`w-full flex flex-col rounded-xl px-4 py-3 gap-2 text-left transition-all duration-200 ${
+      active
+        ? "border-2 border-logo-primary/50 bg-logo-primary/10"
+        : "border-2 border-mid-gray/20 cursor-pointer hover:border-logo-primary/50 hover:bg-logo-primary/5 hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]"
     }`}
   >
-    <span className="min-w-0">
-      <span className="block text-sm font-medium truncate">{title}</span>
-      <span className="block text-xs text-text/50">{detail}</span>
-    </span>
-    {active && (
-      <span className="flex items-center gap-1 text-xs font-medium text-logo-primary shrink-0">
-        <Check className="w-3.5 h-3.5" />
-        {activeLabel}
-      </span>
-    )}
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-semibold truncate">{title}</span>
+          {badge && <Badge variant="secondary">{badge}</Badge>}
+        </div>
+        {subtitle && subtitle !== title && (
+          <p className="text-text/50 text-xs truncate">{subtitle}</p>
+        )}
+      </div>
+      {active && (
+        <Badge>
+          <Check className="w-3 h-3 me-1" />
+          {activeLabel}
+        </Badge>
+      )}
+    </div>
+
+    <div className="flex items-center gap-4 text-xs text-text/60 flex-wrap">
+      {facts.filter(Boolean).map((fact, index) => (
+        <span key={index} className="flex items-center gap-1.5">
+          {fact!.icon}
+          {fact!.text}
+        </span>
+      ))}
+    </div>
   </button>
 );
