@@ -812,7 +812,10 @@ mod tests {
 
     #[test]
     fn test_apply_custom_words_handles_unicode_punctuation() {
-        let text = "「Handee。」";
+        // The input has to be a *misspelling* of the custom word — that is what
+        // gives the fuzzy match something to correct. The point of the test is
+        // that the CJK brackets and full stop around it survive the correction.
+        let text = "「Murmell。」";
         let custom_words = vec!["Murmel".to_string()];
         let result = apply_custom_words(text, &custom_words, 0.5);
         assert_eq!(result, "「Murmel。」");
