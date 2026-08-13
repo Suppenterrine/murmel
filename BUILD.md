@@ -172,19 +172,23 @@ CMake Error at .../CMakePackageConfigHelpers.cmake:519 (configure_file):
 -- Configuring incomplete, errors occurred!
 ```
 
-**Ignore the second error — it is only a consequence of the first.** The real
-cause: `GGML_CPU_ALL_VARIANTS=ON` builds many CPU variants in parallel
-(`--parallel 16`). If CMake decides it has to _re-configure_ mid-build, all
-those projects hit the same `generate.stamp` at once and Windows denies the
-concurrent access.
+**Ignore the second error — it is only a consequence of the first.**
 
-**What triggers the re-configure: mixing build commands.** `tauri dev` compiles
-with `--no-default-features`, which is a _different_ build from a plain
-`cargo build` — different feature hash, different `OUT_DIR`, its own native
-build tree. Running `cargo build` first therefore warms nothing up; it only
-leaves behind a finished CMake tree that the next `tauri dev` trips over.
+**Cause: build parallelism.** `GGML_CPU_ALL_VARIANTS=ON` makes ggml build each
+CPU variant as its own MSBuild project (`ggml-cpu-sse42-feats`,
+`-sandybridge-feats`, …). Whenever CMake re-runs its generate step, several of
+those projects touch the same `ggml/src/CMakeFiles/generate.stamp` at once, and
+Windows refuses the concurrent access. Note which projects the error names —
+there are always at least two, which is the tell.
 
-**Fix — do not pre-build, and clear the broken tree:**
+**Already handled in this repo:** [`.cargo/config.toml`](.cargo/config.toml)
+pins `[build] jobs = 4`. cmake-rs derives `cmake --build --parallel N` from
+cargo's `NUM_JOBS`, so capping cargo caps CMake. That keeps the concurrency
+below the collision threshold. Do not raise it on Windows without testing a
+native rebuild.
+
+If you hit the error anyway, the build tree is left half-configured and must be
+cleared — re-running the same command will not repair it:
 
 ```bash
 # 1. Drop the short NTFS junction (rmdir removes only the link, never the target)
@@ -193,17 +197,17 @@ cmd //c rmdir "%LOCALAPPDATA%\tcs\<hash>"
 # 2. Drop the half-configured build dir
 rm -rf src-tauri/target/debug/build/transcribe-cpp-sys-<hash>
 
-# 3. Let tauri build it from scratch, on its own
+# 3. Build again
 bun run tauri dev
 ```
 
 Find `<hash>` by matching the junction in `%LOCALAPPDATA%\tcs\` to the
 `transcribe-cpp-sys-*` directory it points at.
 
-**Rule of thumb: run `bun run tauri dev` on its own.** Do not precede it with
-`cargo build`/`cargo check` on the same checkout. If the collision ever shows up
-during normal development, cap the parallelism in `.cargo/config.toml`
-(`[build] jobs = 4`) — cmake derives `--parallel` from cargo's `NUM_JOBS`.
+**Also worth knowing: `cargo build` does not warm up `tauri dev`.** `tauri dev`
+compiles with `--no-default-features`, which is a _different_ build — different
+feature hash, different `OUT_DIR`, its own native build tree. Pre-building buys
+nothing and only doubles the native compile.
 
 ### AppImage build fails on Arch / rolling-release distros
 

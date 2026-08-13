@@ -1,4 +1,19 @@
 [build]
+# Windows: begrenzt die Job-Zahl — und damit auch `cmake --build --parallel N`,
+# denn cmake-rs leitet sie aus cargos NUM_JOBS ab.
+#
+# Warum das nötig ist: ggml baut mit GGML_CPU_ALL_VARIANTS=ON viele CPU-Varianten
+# als eigene MSBuild-Projekte (ggml-cpu-sse42-feats, -sandybridge-feats, …). Bei
+# voller Parallelität fassen mehrere davon gleichzeitig dieselbe Datei
+# `ggml/src/CMakeFiles/generate.stamp` an; Windows verweigert den konkurrierenden
+# Zugriff, CMake bricht mit „Cannot restore timestamp … Zugriff verweigert" ab und
+# meldet anschließend irreführend „configure_file: No such file or directory".
+# Siehe BUILD.md → Troubleshooting.
+#
+# Kostet beim ersten Bauen Zeit, danach kaum: Rust-Änderungen betreffen nur noch
+# das murmel-Crate selbst. Wer keinen nativen Neubau erwartet, kann pro Aufruf
+# mit `cargo build -j 16` übersteuern.
+jobs = 4
 
 # Build-Umgebung für den nativen Teil (transcribe-cpp / ggml).
 #
