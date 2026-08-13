@@ -23,6 +23,8 @@ type PostProcessProviderState = {
   isModelUpdating: boolean;
   isFetchingModels: boolean;
   handleProviderSelect: (providerId: string) => void;
+  /** Sets provider and model in one go — picking from the list is one decision. */
+  handleModelPick: (providerId: string, model: string) => void;
   handleModelSelect: (value: string) => void;
   handleModelCreate: (value: string) => void;
   handleRefreshModels: () => void;
@@ -114,6 +116,23 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
       providers,
       settings,
     ],
+  );
+
+  /**
+   * Choosing a model from the list also decides where it runs.
+   *
+   * The provider is set first and awaited: writing the model against the old
+   * provider would file it under the wrong key, and the setting is stored per
+   * provider.
+   */
+  const handleModelPick = useCallback(
+    async (providerId: string, pickedModel: string) => {
+      if (providerId !== selectedProviderId) {
+        await setPostProcessProvider(providerId);
+      }
+      await updatePostProcessModel(providerId, pickedModel);
+    },
+    [selectedProviderId, setPostProcessProvider, updatePostProcessModel],
   );
 
   const handleBaseUrlChange = useCallback(
@@ -228,6 +247,7 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
     isModelUpdating,
     isFetchingModels,
     handleProviderSelect,
+    handleModelPick,
     handleModelSelect,
     handleModelCreate,
     handleRefreshModels,

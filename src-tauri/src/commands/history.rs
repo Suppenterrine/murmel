@@ -41,6 +41,21 @@ pub async fn search_history_entries(
         .map_err(|e| e.to_string())
 }
 
+/// Average words per dictation, or `null` while there is too little to average.
+///
+/// Feeds the cost estimate in the model picker: a price per million tokens
+/// answers a question nobody has, a price per dictation answers the one they do.
+#[tauri::command]
+#[specta::specta]
+pub async fn get_average_dictation_words(
+    _app: AppHandle,
+    history_manager: State<'_, Arc<HistoryManager>>,
+) -> Result<Option<f64>, String> {
+    history_manager
+        .average_word_count()
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn toggle_history_entry_saved(

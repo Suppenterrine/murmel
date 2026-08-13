@@ -1364,6 +1364,35 @@ pub fn stop_local_llm_service() -> Result<(), String> {
     crate::local_llm::stop_ollama()
 }
 
+/// Models installed in the local service, with size and quantisation.
+#[tauri::command]
+#[specta::specta]
+pub async fn list_local_llm_models(
+    app: AppHandle,
+) -> Result<Vec<crate::post_process_models::LocalModel>, String> {
+    let settings = settings::get_settings(&app);
+
+    let base_url = settings
+        .post_process_providers
+        .iter()
+        .find(|p| p.id == settings::OLLAMA_PROVIDER_ID)
+        .map(|p| p.base_url.clone())
+        .ok_or_else(|| "No local provider configured.".to_string())?;
+
+    crate::post_process_models::fetch_local_models(&base_url).await
+}
+
+/// OpenRouter's catalogue, prices included. Needs no API key.
+#[tauri::command]
+#[specta::specta]
+pub async fn list_remote_llm_models() -> Result<Vec<crate::post_process_models::RemoteModel>, String>
+{
+    crate::post_process_models::fetch_remote_models(
+        crate::post_process_models::OPENROUTER_CATALOG_URL,
+    )
+    .await
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn set_post_process_selected_prompt(app: AppHandle, id: String) -> Result<(), String> {

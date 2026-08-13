@@ -17,6 +17,7 @@ mod memory;
 mod overlay;
 mod paste_tx;
 pub mod portable;
+mod post_process_models;
 mod secure_input;
 mod settings;
 mod shortcut;
@@ -677,6 +678,9 @@ pub fn run(cli_args: CliArgs) {
             shortcut::check_post_process_endpoint,
             shortcut::start_local_llm_service,
             shortcut::stop_local_llm_service,
+            shortcut::list_local_llm_models,
+            shortcut::list_remote_llm_models,
+            commands::history::get_average_dictation_words,
             shortcut::add_post_process_prompt,
             shortcut::update_post_process_prompt,
             shortcut::delete_post_process_prompt,

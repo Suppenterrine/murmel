@@ -905,6 +905,32 @@ impl HistoryManager {
         Ok(PaginatedHistory { entries, has_more })
     }
 
+    /// Average words per dictation, from the recorded statistics.
+    ///
+    /// This is what turns a catalogue price into an answer: "$3 per million
+    /// tokens" says nothing useful, "roughly this much per dictation" does —
+    /// and only the user's own history knows how long their dictations are.
+    ///
+    /// `None` until enough has been dictated to mean anything; a single
+    /// three-word test would otherwise set the yardstick.
+    pub fn average_word_count(&self) -> Result<Option<f64>> {
+        const MINIMUM_SAMPLE: i64 = 5;
+
+        let conn = self.get_connection()?;
+        let (count, total): (i64, Option<i64>) = conn.query_row(
+            "SELECT COUNT(*), SUM(word_count) FROM usage_stats
+             WHERE word_count IS NOT NULL AND word_count > 0",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+
+        if count < MINIMUM_SAMPLE {
+            return Ok(None);
+        }
+
+        Ok(total.map(|total| total as f64 / count as f64))
+    }
+
     /// Turn user input into a safe fts5 query.
     ///
     /// fts5 `MATCH` takes a query language of its own: bare `AND`, `OR`, `-`,

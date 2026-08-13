@@ -15,6 +15,7 @@ import { ResetButton } from "../../ui/ResetButton";
 import { Input } from "../../ui/Input";
 
 import { EndpointStatusNotice } from "../PostProcessingSettingsApi/EndpointStatusNotice";
+import { ModelPicker } from "../PostProcessingSettingsApi/ModelPicker";
 import { ProviderSelect } from "../PostProcessingSettingsApi/ProviderSelect";
 import { BaseUrlField } from "../PostProcessingSettingsApi/BaseUrlField";
 import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
@@ -105,14 +106,30 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
         </>
       )}
 
-      {!state.isAppleProvider && (
+      {/* Ollama and OpenRouter get the browsable list; a custom endpoint keeps
+          the free-text field, because Murmel cannot know what it offers. */}
+      {!state.isAppleProvider && !state.isCustomProvider && (
         <SettingContainer
           title={t("settings.postProcessing.api.model.title")}
-          description={
-            state.isCustomProvider
-              ? t("settings.postProcessing.api.model.descriptionCustom")
-              : t("settings.postProcessing.api.model.descriptionDefault")
-          }
+          description={t(
+            "settings.postProcessing.api.model.descriptionDefault",
+          )}
+          descriptionMode="tooltip"
+          layout="stacked"
+          grouped={true}
+        >
+          <ModelPicker
+            activeProviderId={state.selectedProviderId}
+            activeModel={state.model}
+            onPick={state.handleModelPick}
+          />
+        </SettingContainer>
+      )}
+
+      {!state.isAppleProvider && state.isCustomProvider && (
+        <SettingContainer
+          title={t("settings.postProcessing.api.model.title")}
+          description={t("settings.postProcessing.api.model.descriptionCustom")}
           descriptionMode="tooltip"
           layout="stacked"
           grouped={true}

@@ -272,6 +272,30 @@ async searchHistoryEntries(query: string | null, onlySaved: boolean, limit: numb
     else return { status: "error", error: e  as any };
 }
 },
+async listLocalLlmModels() : Promise<Result<LocalModel[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_local_llm_models") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listRemoteLlmModels() : Promise<Result<RemoteModel[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_remote_llm_models") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getAverageDictationWords() : Promise<Result<number | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_average_dictation_words") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async stopLocalLlmService() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("stop_local_llm_service") };
@@ -1033,6 +1057,30 @@ error: string | null;
  */
 owned_pid: number | null }
 export type GpuDeviceOption = { id: number; name: string; total_vram_mb: number }
+/**
+ * A model installed in Ollama.
+ */
+export type LocalModel = {
+/**
+ * Tag as Ollama knows it, e.g. `qwen3:4b` — this is what gets configured.
+ */
+name: string; size_bytes: number;
+/**
+ * e.g. "8.0B". Ollama reports it as text, and it is shown as text.
+ */
+parameter_size: string | null;
+/**
+ * e.g. "Q4_K_M".
+ */
+quantization: string | null; family: string | null }
+/**
+ * A model offered through OpenRouter.
+ */
+export type RemoteModel = { id: string; name: string; context_length: number;
+/**
+ * Price per *token*, as the catalogue states it.
+ */
+prompt_price: number; completion_price: number; is_free: boolean }
 export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string;
 /**
  * Whether refinement was *asked for* (which hotkey was pressed) — a
