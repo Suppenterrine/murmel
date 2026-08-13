@@ -411,7 +411,11 @@
           "reachable_other": "Local service running, {{count}} models available.",
           "unreachable": "Local service not reachable. Refinement will be skipped and the raw transcript inserted.",
           "start": "Start Ollama",
-          "starting": "Starting…"
+          "starting": "Starting…",
+          "stop": "Stop",
+          "stopping": "Stopping…",
+          "ownedByMurmel": "Started by Murmel (process {{pid}})",
+          "startedElsewhere": "Was already running — Murmel leaves it alone"
         },
         "baseUrl": {
           "title": "Base URL",

@@ -1205,8 +1205,20 @@ pub async fn fetch_post_process_models(
         .cloned()
         .unwrap_or_default();
 
-    // Skip fetching if no API key for providers that typically need one
-    if api_key.trim().is_empty() && provider.id != "custom" {
+    // Only demand a key where one is actually needed to *list* models.
+    //
+    // This used to exempt the `custom` provider alone, which meant Ollama —
+    // where no key exists and none is wanted — was rejected before the request
+    // was even made. The result was a status line reporting models found and an
+    // empty dropdown right beneath it, because the two took different routes to
+    // the same endpoint.
+    //
+    // OpenRouter's catalogue is public too: models *and* prices without an
+    // account, so the list can be browsed before signing up.
+    let needs_key = !settings::is_local_endpoint(&provider.base_url)
+        && provider.id != settings::OPENROUTER_PROVIDER_ID;
+
+    if needs_key && api_key.trim().is_empty() {
         return Err(format!(
             "API key is required for {}. Please add an API key to list available models.",
             provider.label
@@ -1229,6 +1241,12 @@ pub struct EndpointStatus {
     pub models: Vec<String>,
     /// Why the local endpoint could not be reached, for the UI to show.
     pub error: Option<String>,
+    /// Process id, when Murmel is the one running the service.
+    ///
+    /// A background process is only acceptable if it is visible and
+    /// controllable — this is what lets the UI say "started by Murmel (pid N)"
+    /// and offer to stop it, instead of leaving something running unseen.
+    pub owned_pid: Option<u32>,
 }
 
 /// Check a refinement provider before it is used in anger.
@@ -1256,6 +1274,7 @@ pub async fn check_post_process_endpoint(
             reachable: None,
             models: Vec::new(),
             error: None,
+            owned_pid: None,
         });
     }
 
@@ -1265,6 +1284,8 @@ pub async fn check_post_process_endpoint(
         .cloned()
         .unwrap_or_default();
 
+    let owned_pid = crate::local_llm::owned_pid();
+
     Ok(
         match crate::llm_client::fetch_models(provider, api_key).await {
             Ok(models) => EndpointStatus {
@@ -1272,12 +1293,14 @@ pub async fn check_post_process_endpoint(
                 reachable: Some(true),
                 models,
                 error: None,
+                owned_pid,
             },
             Err(error) => EndpointStatus {
                 is_local: true,
                 reachable: Some(false),
                 models: Vec::new(),
                 error: Some(error),
+                owned_pid,
             },
         },
     )
@@ -1332,6 +1355,13 @@ pub async fn start_local_llm_service(app: AppHandle, provider_id: String) -> Res
         async move { endpoint_responds(&settings, &provider_id).await }
     })
     .await
+}
+
+/// Stop the local service — only the one Murmel started.
+#[tauri::command]
+#[specta::specta]
+pub fn stop_local_llm_service() -> Result<(), String> {
+    crate::local_llm::stop_ollama()
 }
 
 #[tauri::command]

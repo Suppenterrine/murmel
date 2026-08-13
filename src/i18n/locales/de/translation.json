@@ -411,7 +411,11 @@
           "reachable_other": "Lokaler Dienst läuft, {{count}} Modelle verfügbar.",
           "unreachable": "Lokaler Dienst nicht erreichbar. Die Nachbearbeitung wird übersprungen und das Rohtranskript eingefügt.",
           "start": "Ollama starten",
-          "starting": "Wird gestartet …"
+          "starting": "Wird gestartet …",
+          "stop": "Beenden",
+          "stopping": "Wird beendet …",
+          "ownedByMurmel": "Von Murmel gestartet (Prozess {{pid}})",
+          "startedElsewhere": "Lief bereits — Murmel beendet ihn nicht"
         },
         "baseUrl": {
           "title": "Basis-URL",

@@ -28,6 +28,7 @@ export const EndpointStatusNotice: React.FC<EndpointStatusNoticeProps> = ({
   const [status, setStatus] = useState<EndpointStatus | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
 
   const check = useCallback(async () => {
@@ -65,6 +66,22 @@ export const EndpointStatusNotice: React.FC<EndpointStatusNoticeProps> = ({
       setIsStarting(false);
     }
   }, [providerId, check]);
+
+  const stopService = useCallback(async () => {
+    setIsStopping(true);
+    setStartError(null);
+    try {
+      const result = await commands.stopLocalLlmService();
+      if (result.status !== "ok") {
+        setStartError(String(result.error));
+      }
+      await check();
+    } catch (error) {
+      setStartError(String(error));
+    } finally {
+      setIsStopping(false);
+    }
+  }, [check]);
 
   if (!status) return null;
 
@@ -104,11 +121,36 @@ export const EndpointStatusNotice: React.FC<EndpointStatusNoticeProps> = ({
   if (status.reachable === true) {
     return (
       <Alert variant="success" contained>
-        {isChecking
-          ? t("settings.postProcessing.api.endpoint.checking")
-          : t("settings.postProcessing.api.endpoint.reachable", {
-              count: status.models.length,
-            })}
+        <div className="flex items-center justify-between gap-3">
+          <span>
+            {isChecking
+              ? t("settings.postProcessing.api.endpoint.checking")
+              : t("settings.postProcessing.api.endpoint.reachable", {
+                  count: status.models.length,
+                })}
+            {/* Who started it matters: a background process Murmel cannot
+                account for is exactly the invisible kind we want to avoid. */}
+            <span className="block text-xs opacity-70">
+              {status.owned_pid
+                ? t("settings.postProcessing.api.endpoint.ownedByMurmel", {
+                    pid: status.owned_pid,
+                  })
+                : t("settings.postProcessing.api.endpoint.startedElsewhere")}
+            </span>
+          </span>
+          {status.owned_pid ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={stopService}
+              disabled={isStopping}
+            >
+              {isStopping
+                ? t("settings.postProcessing.api.endpoint.stopping")
+                : t("settings.postProcessing.api.endpoint.stop")}
+            </Button>
+          ) : null}
+        </div>
       </Alert>
     );
   }

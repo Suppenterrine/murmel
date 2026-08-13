@@ -676,6 +676,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::fetch_post_process_models,
             shortcut::check_post_process_endpoint,
             shortcut::start_local_llm_service,
+            shortcut::stop_local_llm_service,
             shortcut::add_post_process_prompt,
             shortcut::update_post_process_prompt,
             shortcut::delete_post_process_prompt,

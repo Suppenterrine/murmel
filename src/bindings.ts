@@ -272,6 +272,14 @@ async searchHistoryEntries(query: string | null, onlySaved: boolean, limit: numb
     else return { status: "error", error: e  as any };
 }
 },
+async stopLocalLlmService() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_local_llm_service") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async startLocalLlmService(providerId: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("start_local_llm_service", { providerId }) };
@@ -1019,7 +1027,11 @@ reachable: boolean | null; models: string[];
 /**
  * Why the local endpoint could not be reached, for the UI to show.
  */
-error: string | null }
+error: string | null;
+/**
+ * Process id, when Murmel is the one running the service.
+ */
+owned_pid: number | null }
 export type GpuDeviceOption = { id: number; name: string; total_vram_mb: number }
 export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string;
 /**

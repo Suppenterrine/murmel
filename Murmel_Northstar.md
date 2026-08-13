@@ -114,12 +114,15 @@ Handy ist die **einzige Codebase**, die einen soliden, modularen Rust-Core für 
 ### Was noch offen ist
 
 - **React-Frontend** — steht noch (siehe §4.2 für die ehrliche Einordnung)
-- **macOS** — läuft technisch weiter mit, ist aber kein Zielsystem und wird
-  nicht getestet. Seit 0.11.0 **scheitern die beiden macOS-Release-Jobs**: Der
-  vom Upstream geerbte Signaturschritt importiert ein leeres
-  `APPLE_CERTIFICATE`. Folgenlos für Windows und Linux, aber jeder Release
-  bleibt dadurch rot. Zu entscheiden: Schritt überspringen, wenn kein
-  Zertifikat gesetzt ist — oder die macOS-Ziele ganz aus dem Workflow nehmen.
+- **macOS** — läuft im Code weiter mit (die plattformspezifischen Pfade sind
+  nicht entfernt), wird aber **nicht mehr released**. Der Grund ist technisch
+  und nicht zu umgehen, ohne ein Apple-Zertifikat zu kaufen: `tauri build`
+  signiert bedingungslos, sobald `APPLE_CERTIFICATE` in der Umgebung steht, und
+  der geerbte Workflow setzt die Variable auf einen leeren String statt sie
+  wegzulassen. Ein Release, der bei jedem Lauf rot meldet, verdeckt die
+  Fehlschläge, auf die es ankommt — deshalb sind die beiden macOS-Ziele seit
+  0.12.0 aus der Matrix. Zurückholen: zwei Einträge in `release.yml` plus ein
+  Zertifikat.
 
 ### Erledigt
 
@@ -222,7 +225,7 @@ größte Gewinn der Fork-Entscheidung:
 | Baustein                | Wo                            | Was es kann                                                                                          |
 | ----------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
 | **LLM-Client**          | `src-tauri/src/llm_client.rs` | OpenAI-kompatible Chat-Completions, Structured Outputs, Reasoning-Abschaltung mit Provider-Fallbacks |
-| **Provider-Verwaltung** | `src-tauri/src/settings.rs`   | Mehrere Endpunkte parallel (Ollama, OpenAI, OpenRouter, Anthropic, Groq, …), je eigener Schlüssel     |
+| **Provider-Verwaltung** | `src-tauri/src/settings.rs`   | Mehrere Endpunkte parallel (Ollama, OpenAI, OpenRouter, Anthropic, Groq, …), je eigener Schlüssel    |
 | **Prompt-System**       | `post_process_prompts`        | Vier Presets plus frei definierbare Prompts, per Auswahl umschaltbar                                 |
 | **Zweiter Hotkey**      | `--toggle-post-process`       | Diktat _mit_ Nachbearbeitung, getrennt vom normalen Diktat                                           |
 | **Historie**            | `post_process_runs`           | Ein Eintrag je Veredelungslauf, auch für fehlgeschlagene (§9)                                        |

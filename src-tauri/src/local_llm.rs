@@ -1,20 +1,27 @@
-//! Starting the local language-model service.
+//! Starting and stopping the local language-model service.
 //!
 //! Refinement through Ollama is Murmel's default, which only works if Ollama is
 //! actually running. Leaving that to the user means sending them to a terminal
 //! or hoping an autostart entry fired — and when it did not, the failure is
 //! silent: the dictation simply arrives unrefined.
 //!
-//! So Murmel starts the service itself. Two deliberate limits:
+//! Murmel therefore runs `ollama serve` itself. That is a background process
+//! with no window of its own, which is only acceptable because Murmel makes it
+//! visible and controllable: the settings screen shows whether it is running,
+//! who started it, and offers to start or stop it. An invisible process would
+//! not be.
 //!
-//! - **It never stops it again.** The process belongs to the user, not to
-//!   Murmel; other tools may be talking to the same instance.
-//! - **It only starts what is already installed.** Nothing is downloaded and
-//!   nothing is installed — Murmel launches a program the user chose to have.
+//! Two limits remain:
+//!
+//! - **Only what Murmel started gets stopped.** A service the user or another
+//!   tool launched is left alone — something else may be talking to it.
+//! - **Nothing is installed.** Murmel launches a program the user chose to
+//!   have; it does not download one.
 
 use log::{debug, info, warn};
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Child, Command};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 /// How long to wait for the service to answer after launching it. Ollama has to
@@ -23,23 +30,30 @@ use std::time::{Duration, Instant};
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(20);
 const POLL_INTERVAL: Duration = Duration::from_millis(400);
 
+/// The child process, while Murmel is the one running it.
+///
+/// Kept so the service can be stopped again — and so the UI can say "started by
+/// Murmel" rather than merely "running", which is the difference between a
+/// background process and an invisible one.
+static OWNED: Mutex<Option<Child>> = Mutex::new(None);
+
 /// Locate the Ollama executable.
 ///
-/// The PATH is checked first — a user who installed Ollama elsewhere has it
-/// there — with the platform's default install location as a fallback, because
-/// on Windows the installer does not always reach an already-running shell's
-/// environment.
+/// Deliberately **not** the tray application (`ollama app.exe`): launching it
+/// brings up its window without reliably serving the API, so Murmel would
+/// report success while nothing listens. `ollama serve` is the documented way
+/// to run the server, and it is the one that works.
 fn find_ollama() -> Option<PathBuf> {
     #[cfg(windows)]
     let candidates = {
         let mut candidates = Vec::new();
         if let Ok(local) = std::env::var("LOCALAPPDATA") {
-            let base = PathBuf::from(local).join("Programs").join("Ollama");
-            // The tray application is preferred: it starts the server the same
-            // way the user would, complete with its tray icon, instead of
-            // leaving an invisible orphan process behind.
-            candidates.push(base.join("ollama app.exe"));
-            candidates.push(base.join("ollama.exe"));
+            candidates.push(
+                PathBuf::from(local)
+                    .join("Programs")
+                    .join("Ollama")
+                    .join("ollama.exe"),
+            );
         }
         candidates.push(PathBuf::from("ollama.exe"));
         candidates
@@ -67,12 +81,28 @@ fn find_ollama() -> Option<PathBuf> {
     })
 }
 
-/// True when the executable is Ollama's tray application, which starts the
-/// server on its own and takes no `serve` argument.
-fn is_tray_app(path: &std::path::Path) -> bool {
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .is_some_and(|name| name.eq_ignore_ascii_case("ollama app.exe"))
+/// Process id of the service Murmel started, if it is still ours.
+pub fn owned_pid() -> Option<u32> {
+    let mut guard = OWNED.lock().ok()?;
+
+    // `try_wait` reaps the child if it exited on its own, so a crashed service
+    // does not keep being reported as running.
+    if let Some(child) = guard.as_mut() {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                debug!("Local LLM service exited on its own ({status})");
+                *guard = None;
+                return None;
+            }
+            Ok(None) => return Some(child.id()),
+            Err(err) => {
+                warn!("Could not query local LLM service: {err}");
+                return None;
+            }
+        }
+    }
+
+    None
 }
 
 /// Launch the service. Returns once it has been spawned — not once it answers.
@@ -85,11 +115,9 @@ pub fn spawn_ollama() -> Result<(), String> {
         );
     };
 
-    info!("Starting local LLM service: {}", path.display());
+    info!("Starting local LLM service: {} serve", path.display());
     let mut command = Command::new(&path);
-    if !is_tray_app(&path) {
-        command.arg("serve");
-    }
+    command.arg("serve");
 
     // Without this the server would inherit Murmel's stdio and, on Windows,
     // flash up a console window.
@@ -105,14 +133,41 @@ pub fn spawn_ollama() -> Result<(), String> {
         command.creation_flags(CREATE_NO_WINDOW);
     }
 
-    command
+    let child = command
         .spawn()
-        .map(|child| {
-            // The handle is dropped on purpose: the service outlives Murmel and
-            // is not ours to wait on or reap.
-            debug!("Local LLM service started as pid {}", child.id());
-        })
-        .map_err(|err| format!("Could not start Ollama: {err}"))
+        .map_err(|err| format!("Could not start Ollama: {err}"))?;
+
+    debug!("Local LLM service started as pid {}", child.id());
+    if let Ok(mut guard) = OWNED.lock() {
+        *guard = Some(child);
+    }
+
+    Ok(())
+}
+
+/// Stop the service — but only if Murmel is the one that started it.
+pub fn stop_ollama() -> Result<(), String> {
+    let mut guard = OWNED
+        .lock()
+        .map_err(|_| "Could not access the service handle.".to_string())?;
+
+    let Some(child) = guard.as_mut() else {
+        return Err(
+            "This service was not started by Murmel, so Murmel does not stop it. \
+             Something else may be using it."
+                .to_string(),
+        );
+    };
+
+    child
+        .kill()
+        .map_err(|err| format!("Could not stop Ollama: {err}"))?;
+    // Reap immediately; otherwise the process lingers as a zombie on Unix.
+    let _ = child.wait();
+
+    info!("Local LLM service stopped");
+    *guard = None;
+    Ok(())
 }
 
 /// Start the service and wait until it answers, or give up.
@@ -151,15 +206,16 @@ where
 mod tests {
     use super::*;
 
+    /// Nothing to stop means a clear message, not a silent success that leaves
+    /// the user wondering whether anything happened.
     #[test]
-    fn tray_app_is_recognised_by_name() {
-        assert!(is_tray_app(std::path::Path::new(
-            r"C:\Users\x\AppData\Local\Programs\Ollama\ollama app.exe"
-        )));
-        // Case differences must not decide whether `serve` is appended —
-        // passing it to the tray app would make the launch fail.
-        assert!(is_tray_app(std::path::Path::new("OLLAMA APP.EXE")));
-        assert!(!is_tray_app(std::path::Path::new("ollama.exe")));
-        assert!(!is_tray_app(std::path::Path::new("/usr/bin/ollama")));
+    fn stopping_a_service_murmel_did_not_start_is_refused() {
+        assert!(OWNED.lock().unwrap().is_none());
+        assert!(stop_ollama().is_err());
+    }
+
+    #[test]
+    fn no_owned_pid_before_starting_anything() {
+        assert_eq!(owned_pid(), None);
     }
 }
