@@ -604,6 +604,13 @@
         "description": "Quellcode ansehen und beitragen",
         "button": "Auf GitHub ansehen"
       },
+      "releaseNotes": {
+        "title": "Versionsverlauf",
+        "subtitle": "Was sich geändert hat",
+        "description": "Anmerkungen zu allen Versionen, die diese Ausgabe mitbringt — auch zu denen, deren Fenster du übersprungen hast.",
+        "version": "Version {{version}}",
+        "current": "installiert"
+      },
       "supportDevelopment": {
         "title": "Entwicklung unterstützen",
         "description": "Hilf uns, Murmel weiterzuentwickeln",

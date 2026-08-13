@@ -603,6 +603,13 @@
         "title": "App Data Directory",
         "description": "Location where Murmel stores its data"
       },
+      "releaseNotes": {
+        "title": "Version history",
+        "subtitle": "What changed",
+        "description": "Notes for every version bundled with this build — including the ones whose window you skipped.",
+        "version": "Version {{version}}",
+        "current": "installed"
+      },
       "sourceCode": {
         "title": "Source Code",
         "description": "View source code and contribute",

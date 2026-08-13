@@ -13,6 +13,7 @@ import { LogDirectory } from "../debug";
 import MurmelHand from "../../icons/MurmelHand";
 import MurmelTextLogo from "../../icons/MurmelTextLogo";
 import Copyright from "../../Copyright";
+import { ReleaseNotesArchive } from "../../whats-new/ReleaseNotesArchive";
 
 export const AboutSettings: React.FC = () => {
   const { t } = useTranslation();
@@ -71,6 +72,17 @@ export const AboutSettings: React.FC = () => {
 
         <AppDataDirectory descriptionMode="tooltip" grouped={true} />
         <LogDirectory grouped={true} />
+      </SettingsGroup>
+
+      <SettingsGroup title={t("settings.about.releaseNotes.title")}>
+        <SettingContainer
+          title={t("settings.about.releaseNotes.subtitle")}
+          description={t("settings.about.releaseNotes.description")}
+          grouped={true}
+          layout="stacked"
+        >
+          <ReleaseNotesArchive currentVersion={version} />
+        </SettingContainer>
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.about.acknowledgments.title")}>

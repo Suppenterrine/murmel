@@ -82,6 +82,18 @@ export const findReleaseNoteToShow = ({
   return candidate;
 };
 
+/**
+ * All bundled release notes, newest first.
+ *
+ * Exists because {@link findReleaseNoteToShow} only ever surfaces the *highest*
+ * unseen note: updating across two versions silently skips the older one, and
+ * nothing would bring it back. The archive is the way to read what was missed.
+ */
+export const listReleaseNotes = (): ReleaseNote[] =>
+  Array.from(releaseNotesByVersion.values()).sort((a, b) =>
+    compareVersions(b.version, a.version),
+  );
+
 export const findLatestReleaseNote = (): ReleaseNote | null => {
   const candidate = Array.from(releaseNotesByVersion.values()).sort((a, b) =>
     compareVersions(b.version, a.version),
