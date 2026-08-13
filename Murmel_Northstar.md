@@ -114,7 +114,12 @@ Handy ist die **einzige Codebase**, die einen soliden, modularen Rust-Core für 
 ### Was noch offen ist
 
 - **React-Frontend** — steht noch (siehe §4.2 für die ehrliche Einordnung)
-- **macOS** — läuft technisch weiter mit, ist aber kein Zielsystem und wird nicht getestet
+- **macOS** — läuft technisch weiter mit, ist aber kein Zielsystem und wird
+  nicht getestet. Seit 0.11.0 **scheitern die beiden macOS-Release-Jobs**: Der
+  vom Upstream geerbte Signaturschritt importiert ein leeres
+  `APPLE_CERTIFICATE`. Folgenlos für Windows und Linux, aber jeder Release
+  bleibt dadurch rot. Zu entscheiden: Schritt überspringen, wenn kein
+  Zertifikat gesetzt ist — oder die macOS-Ziele ganz aus dem Workflow nehmen.
 
 ### Erledigt
 
@@ -550,13 +555,19 @@ Erst angehen, wenn Windows und Ubuntu wirklich rundlaufen.
 - [x] Eigenes Branding: Wortmarke, App-Icon, Tray-Icon-Set
 - [x] MIT-Attribution und Herkunftsdokumentation ([NOTICE.md](NOTICE.md))
 
-### Phase 1: Windows-Alltagstauglichkeit
+### Phase 1: Windows-Alltagstauglichkeit ✅
 
-- [ ] Build und Start auf Windows verifizieren
-- [ ] Hotkeys einrichten (Diktat + Diktat-mit-Nachbearbeitung)
-- [ ] Mehrere Modelle im Alltag vergleichen (deutsche Qualität, Latenz, RAM) und **dann** einen Default festlegen
-- [ ] Startzeit und Transkriptionsgeschwindigkeit messen (Baseline)
-- [ ] Eigenen Updater-Signaturschlüssel erzeugen
+- [x] Build und Start auf Windows verifizieren
+- [x] Hotkeys einrichten (Diktat + Diktat-mit-Nachbearbeitung)
+- [x] Eigenen Updater-Signaturschlüssel erzeugen — und ab 0.11.0 einen
+      vollständigen Release-Zyklus samt Selbstupdate durchlaufen
+- [x] Transkriptionsgeschwindigkeit messen — nicht als einmalige Baseline,
+      sondern dauerhaft: `processing_ms`, `duration_ms` und `word_count`
+      fallen seit 0.11.0 bei jedem Diktat mit an (§6.2). Auszuwerten ist
+      das noch, siehe Phase 2.
+- [ ] Mehrere Modelle im Alltag vergleichen (deutsche Qualität, Latenz, RAM)
+      und **dann** einen Default festlegen — jetzt datengestützt möglich,
+      braucht aber Nutzungsdaten über mehrere Tage
 
 ### Phase 2: Murmel wird Murmel
 
