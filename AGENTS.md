@@ -231,6 +231,18 @@ Murmel is a personal fork of [Handy](https://github.com/cjpais/Handy) (MIT, © C
 - **The Northstar is binding.** [`Murmel_Northstar.md`](Murmel_Northstar.md) defines what Murmel is and — just as importantly — what it deliberately will not become. Check a feature against it before building.
 - **No community governance.** There is no feature freeze, no RFC process, and no Discussions requirement. Upstream's contributor ceremony does not apply.
 - **Upstream is a source, not an authority.** Cherry-picking fixes from `upstream/master` is welcome; matching upstream's roadmap is not a goal.
+- **`gh` targets the upstream repo by default.** GitHub knows this repo as a
+  fork, so `gh run`, `gh workflow run` and friends resolve to `cjpais/Handy`
+  unless told otherwise — a dispatch meant for Murmel would fire in someone
+  else's project. Fix it once per clone:
+
+  ```bash
+  gh repo set-default Suppenterrine/murmel
+  ```
+
+  That writes `remote.origin.gh-resolved` into `.git/config`, which is **not**
+  versioned — every fresh clone needs it again. Until then, pass
+  `--repo Suppenterrine/murmel` explicitly.
 
 **Never rename these** — they are external and unrelated to the Handy→Murmel rebrand:
 
