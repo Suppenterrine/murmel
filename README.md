@@ -1,15 +1,36 @@
-# Murmel
+<p align="center">
+  <img src=".github/assets/banner.png" alt="Murmel — Diktieren, das den Rechner nicht verlässt" width="820">
+</p>
 
-**Ein persönlicher, lokal laufender Diktier-Assistent. Kein SaaS, kein Cloud-Zwang.**
+<p align="center">
+  <a href="https://github.com/Suppenterrine/murmel/releases/latest">
+    <img src="https://img.shields.io/github/v/release/Suppenterrine/murmel?style=for-the-badge&labelColor=1a1915&color=c45c4a" alt="Aktuelle Version">
+  </a>
+  <img src="https://img.shields.io/badge/lokal-kein%20Cloud--Zwang-c45c4a?style=for-the-badge&labelColor=1a1915" alt="Läuft lokal">
+  <img src="https://img.shields.io/badge/Lizenz-MIT-8a847a?style=for-the-badge&labelColor=1a1915" alt="MIT-Lizenz">
+</p>
+
+---
 
 Taste drücken, sprechen, Text landet am Cursor — in jeder Anwendung, ohne dass ein
-Byte den Rechner verlässt. Murmel ist ein privater Fork von
+Byte den Rechner verlässt. Murmel ist ein persönlicher Fork von
 [Handy](https://github.com/cjpais/Handy) und verfolgt eine eigene Vision:
 siehe **[Murmel_Northstar.md](Murmel_Northstar.md)**.
 
-> **Status:** Frisch geforkt. Das Rebranding steht, die Murmel-eigenen Features
-> (Text-Nachbearbeitung per LLM, lokale Nutzungsstatistiken, schlankeres UI) sind
-> in Arbeit. Es gibt noch keine veröffentlichten Releases — Murmel wird selbst gebaut.
+## Installation
+
+**[Murmel für Windows herunterladen](https://github.com/Suppenterrine/murmel/releases/latest)** —
+Installer ausführen, fertig.
+
+> Windows meldet beim ersten Start „Der Computer wurde durch Windows geschützt".
+> Über **Weitere Informationen → Trotzdem ausführen** fortfahren. Grund ist ein
+> fehlendes kostenpflichtiges Code-Signing-Zertifikat; die Updates selbst sind
+> kryptografisch signiert.
+
+Beim ersten Start lädt Murmel ein Sprachmodell herunter — dafür wird einmalig
+Internet gebraucht. Danach läuft alles offline.
+
+Linux-Pakete folgen; bis dahin siehe [BUILD.md](BUILD.md).
 
 ## Warum ein eigener Fork?
 
@@ -34,9 +55,7 @@ Die gesamte Verarbeitung ist lokal:
   **Parakeet V3** (CPU-optimiert, automatische Spracherkennung)
 - Läuft auf Windows, Linux und macOS
 
-## Quick Start
-
-Es gibt noch keine Binaries — Murmel wird aus dem Quellcode gebaut:
+## Selbst bauen
 
 ```bash
 bun install
@@ -45,7 +64,8 @@ curl -o src-tauri/resources/models/silero_vad_v4.onnx https://blob.handy.compute
 bun run tauri dev
 ```
 
-Plattformspezifische Build-Voraussetzungen stehen in [BUILD.md](BUILD.md).
+Plattformspezifische Build-Voraussetzungen stehen in [BUILD.md](BUILD.md) — unter
+Windows ist das Vulkan SDK Pflicht.
 
 ## Architecture
 
