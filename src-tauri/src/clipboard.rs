@@ -336,7 +336,7 @@ fn detect_ydotool_key_syntax() -> YdotoolKeySyntax {
                     syntax
                 })
             } else {
-                // Preserve Handy's existing behavior and compatibility with current ydotool.
+                // Preserve Murmel's existing behavior and compatibility with current ydotool.
                 log::warn!(
                     "Could not recognize ydotool key --help output (exit status {:?}); using raw-keycode syntax",
                     output.status.code()

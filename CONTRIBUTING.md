@@ -1,21 +1,23 @@
-# Contributing to Handy
+# Contributing to Murmel
 
-Thank you for your interest in contributing to Handy! This guide will help you get started with contributing to this open source speech-to-text application.
+Thanks for your interest. This guide covers how to build Murmel and how contributions are handled.
 
-## ⚠️ Feature Freeze
+## ⚠️ Read this first
 
-**Handy is currently undergoing a feature freeze.** If you are submitting a PR which is a new feature that the community has not asked for, it will be rejected. If the community has asked for it, or you have explicitly gathered support, it may still be considered.
+**Murmel is a personal fork of [Handy](https://github.com/cjpais/Handy), maintained by one person for their own use.** That has consequences:
 
-**Bug fixes are the top priority.** There are 60+ issues to fix. Please focus your contributions on fixing bugs and improving stability.
+- **The [Northstar](Murmel_Northstar.md) decides.** A feature can be well-built and still be rejected because it does not fit the vision. Please open an issue before investing time in a feature PR.
+- **Bug fixes and platform fixes (Windows, Ubuntu 24.04) are the most welcome contributions.**
+- **Bugs in upstream code belong upstream.** If a bug also exists in Handy, reporting it at [cjpais/Handy](https://github.com/cjpais/Handy/issues) helps more people than fixing it only here.
 
 ## 📖 Philosophy
 
-Handy aims to be the most forkable speech-to-text app. The goal is to create both a useful tool and a foundation for others to build upon—a well-patterned, simple codebase that serves the community. We prioritize:
+Murmel is a private, local dictation assistant — nothing more, deliberately. Priorities:
 
-- **Simplicity**: Clear, maintainable code over clever solutions
-- **Extensibility**: Make it easy for others to fork and customize
-- **Privacy**: Keep everything local and offline
-- **Accessibility**: Free tooling that belongs in everyone's hands
+- **Privacy**: Local by default. No telemetry, no cloud sync, no analytics.
+- **Restraint**: Every feature and every dependency has to justify itself.
+- **Speed on Windows**: The daily driver sets the pace; Ubuntu 24.04 is carried along, not retrofitted.
+- **Maintainability**: Code a future self still understands in two years.
 
 ## 🚀 Getting Started
 
@@ -34,14 +36,14 @@ Before you begin, ensure you have the following installed:
 2. **Clone your fork**:
 
    ```bash
-   git clone git@github.com:YOUR_USERNAME/Handy.git
-   cd Handy
+   git clone git@github.com:YOUR_USERNAME/Murmel.git
+   cd Murmel
    ```
 
 3. **Add upstream remote**:
 
    ```bash
-   git remote add upstream git@github.com:cjpais/Handy.git
+   git remote add upstream git@github.com:Suppenterrine/murmel.git
    ```
 
 4. **Install dependencies**:
@@ -68,7 +70,7 @@ For detailed platform-specific setup instructions, see [BUILD.md](BUILD.md).
 
 ### Understanding the Codebase
 
-Handy follows a clean architecture pattern:
+Murmel follows a clean architecture pattern:
 
 **Backend (Rust - `src-tauri/src/`):**
 
@@ -92,8 +94,8 @@ For more details, see the Architecture section in [README.md](README.md) or [AGE
 
 ### Before Submitting a Bug Report
 
-1. **Search existing issues** at [github.com/cjpais/Handy/issues](https://github.com/cjpais/Handy/issues)
-2. **Check discussions** at [github.com/cjpais/Handy/discussions](https://github.com/cjpais/Handy/discussions)
+1. **Search existing issues** at [github.com/Suppenterrine/murmel/issues](https://github.com/Suppenterrine/murmel/issues)
+2. **Check discussions** at [github.com/Suppenterrine/murmel/discussions](https://github.com/Suppenterrine/murmel/discussions)
 3. **Try the latest release** to see if the issue has been fixed
 4. **Enable debug mode** (`Cmd/Ctrl+Shift+D`) to gather diagnostic information
 
@@ -121,25 +123,12 @@ Use the [Bug Report template](.github/ISSUE_TEMPLATE/bug_report.md) when creatin
 
 ## 💡 Suggesting Features
 
-We use GitHub Discussions for feature requests rather than issues. This keeps issues focused on bugs and actionable tasks while allowing more open-ended conversations about features.
-
-### Before Suggesting a Feature
-
-1. **Search existing discussions** at [github.com/cjpais/Handy/discussions](https://github.com/cjpais/Handy/discussions)
-2. **Check common feature requests**:
-   - [Post-processing / Editing Transcripts](https://github.com/cjpais/Handy/discussions/168)
-   - [Keyboard Shortcuts / Hotkeys](https://github.com/cjpais/Handy/discussions/211)
-
-### Submitting a Feature Request
-
-1. Go to [Discussions](https://github.com/cjpais/Handy/discussions)
-2. Click "New discussion"
-3. Choose the appropriate category (Ideas, Feature Requests, etc.)
-4. Describe your feature idea including:
-   - The problem you're trying to solve
-   - Your proposed solution
-   - Any alternatives you've considered
-   - How it fits with Handy's philosophy
+1. **Read the [Northstar](Murmel_Northstar.md) first** — especially "Was Murmel _nicht_ sein soll" (§1) and the roadmap (§11). It will answer most questions about whether an idea fits.
+2. **Open an issue** describing:
+   - The problem you are trying to solve (not just the solution you have in mind)
+   - Which Northstar section it supports
+   - Alternatives you considered
+3. **Wait for a reply before writing code.** A rejected feature PR wastes your time, not mine.
 
 ## 🔧 Making Code Contributions
 
@@ -148,19 +137,19 @@ We use GitHub Discussions for feature requests rather than issues. This keeps is
 **This is critical:** Before writing any code, please do the following:
 
 1. **Search existing issues and PRs** - Check both open AND closed issues and pull requests. Someone may have already addressed this, or there may be a reason it was closed.
-   - [Open issues](https://github.com/cjpais/Handy/issues)
-   - [Closed issues](https://github.com/cjpais/Handy/issues?q=is%3Aissue+is%3Aclosed)
-   - [Open PRs](https://github.com/cjpais/Handy/pulls)
-   - [Closed PRs](https://github.com/cjpais/Handy/pulls?q=is%3Apr+is%3Aclosed)
+   - [Open issues](https://github.com/Suppenterrine/murmel/issues)
+   - [Closed issues](https://github.com/Suppenterrine/murmel/issues?q=is%3Aissue+is%3Aclosed)
+   - [Open PRs](https://github.com/Suppenterrine/murmel/pulls)
+   - [Closed PRs](https://github.com/Suppenterrine/murmel/pulls?q=is%3Apr+is%3Aclosed)
 
 2. **If something was previously closed** - If you want to revisit a closed issue or PR, you need to:
    - Provide a strong argument for why it should be reconsidered
-   - Gather community feedback first via [Discussions](https://github.com/cjpais/Handy/discussions)
+   - Gather community feedback first via [Discussions](https://github.com/Suppenterrine/murmel/discussions)
    - Link to that discussion in your PR
 
-3. **Get community feedback for features** - PRs with demonstrated community interest are **much more likely to be merged**. Start a discussion, get feedback, and link to it in your PR. This helps ensure Handy stays focused and useful for the most people without becoming bloated.
+3. **Get community feedback for features** - PRs with demonstrated community interest are **much more likely to be merged**. Start a discussion, get feedback, and link to it in your PR. This helps ensure Murmel stays focused and useful for the most people without becoming bloated.
 
-Community feedback is essential to keeping Handy the best it can be for everyone. It helps prioritize what matters most and prevents feature creep.
+Community feedback is essential to keeping Murmel the best it can be for everyone. It helps prioritize what matters most and prevents feature creep.
 
 ### Development Workflow
 
@@ -215,7 +204,7 @@ Community feedback is essential to keeping Handy the best it can be for everyone
    ```
 
 7. **Create a Pull Request**:
-   - Go to the [Handy repository](https://github.com/cjpais/Handy)
+   - Go to the [Murmel repository](https://github.com/Suppenterrine/murmel)
    - Click "New Pull Request"
    - Select your fork and branch
    - Fill out the PR template completely, including:
@@ -226,7 +215,7 @@ Community feedback is essential to keeping Handy the best it can be for everyone
      - Screenshots/videos if applicable
      - Breaking changes (if any)
 
-   **Remember:** PRs with community support are prioritized. If you haven't already, start a [discussion](https://github.com/cjpais/Handy/discussions) to gather feedback before or alongside your PR. It is not explicitly required to gather feedback, but it certainly helps your PR get merged faster.
+   **Remember:** PRs with community support are prioritized. If you haven't already, start a [discussion](https://github.com/Suppenterrine/murmel/discussions) to gather feedback before or alongside your PR. It is not explicitly required to gather feedback, but it certainly helps your PR get merged faster.
 
 ### AI Assistance Disclosure
 
@@ -310,13 +299,13 @@ Look for issues labeled `good first issue` or `help wanted` if you're new to the
 ## 📞 Getting Help
 
 - **Discord**: Join our [Discord community](https://discord.com/invite/WVBeWsNXK4)
-- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/cjpais/Handy/discussions)
+- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/Suppenterrine/murmel/discussions)
 - **Email**: Reach out at [contact@handy.computer](mailto:contact@handy.computer)
 
 ## 📜 License
 
-By contributing to Handy, you agree that your contributions will be licensed under the MIT License. See [LICENSE](LICENSE) for details.
+By contributing to Murmel, you agree that your contributions will be licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
-**Thank you for contributing to Handy!** Your efforts help make speech-to-text technology more accessible, private, and extensible for everyone.
+**Thank you for contributing to Murmel!** Your efforts help make speech-to-text technology more accessible, private, and extensible for everyone.

@@ -4,13 +4,18 @@
 > Kein SaaS. Kein Cloud-Zwang. Kein Vibe-Coder-Bloat.
 > Nur du, deine Stimme und dein Text.
 
+**Stand:** August 2026 · Fork-Basis: [cjpais/Handy](https://github.com/cjpais/Handy) `b50b52a` (MIT)
+
 ---
 
 ## 1. Northstar
 
 ### Was Murmel sein soll
 
-Murmel ist ein **privater, lokaler Speech-to-Text-Diktierassistent** für Desktop-Systeme (Windows & Ubuntu 24.04). Er läuft vollständig offline, verlässt sich auf keine Cloud-Dienste und gehört allein dem Nutzer.
+Murmel ist ein **privater, lokaler Speech-to-Text-Diktierassistent**. Primärziel ist
+**Windows** (schnell und performant im Alltag), gleichberechtigt daneben **Ubuntu
+24.04**. Langfristig kommt **Android** als eigenständiger Client dazu. Murmel läuft
+lokal, sammelt keine Telemetrie und gehört allein dem Nutzer.
 
 Die zentrale UX-Philosophie ist **Unsichtbarkeit mit Kontrolle**:
 
@@ -18,13 +23,22 @@ Die zentrale UX-Philosophie ist **Unsichtbarkeit mit Kontrolle**:
 - **Kontrolle:** Mit einem globalen Hotkey (z. B. `Ctrl + Win + M`) startest du die Diktat-Session. Mit einem zweiten Hotkey (`Ctrl + Shift + H`) öffnest du die Historie. Alles andere passiert im Hintergrund.
 - **Sofortigkeit:** Gesprochener Text landet sofort am Cursor — egal in welcher Anwendung. Kein Copy-Paste-Zirkus.
 
-### Was Murmel *nicht* sein soll
+### Die vier Säulen
+
+| Säule                                | Bedeutung                                                                                                    |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| **Schnell auf Windows**              | Kalt- und Warmstart unter einer Sekunde bis zur Aufnahmebereitschaft; Transkription schneller als Echtzeit   |
+| **Elegante, kleine UI**              | Ein Fenster, klare Typografie, kein Framework-Ballast im Sichtfeld                                           |
+| **Text verstehen, nicht nur tippen** | Diktiertes wird auf Wunsch formatiert, aufgeräumt, umgeschrieben — wie bei WisprFlow, aber lokal (siehe §5)  |
+| **Deine Daten gehören dir**          | Historie und Nutzungsstatistiken liegen lokal in SQLite; hübsch aufbereitet, aber nie hochgeladen (siehe §6) |
+
+### Was Murmel _nicht_ sein soll
 
 - Kein Meeting-Transkriptions-Tool
 - Kein AI-Agent mit Chat-Interface
 - Kein Cloud-Sync- oder Team-Collaboration-Tool
 - Kein Electron-Monster mit 300 MB RAM-Verbrauch
-- Kein React-Bloat mit 47 NPM-Dependencies
+- Kein Bloat: jede Dependency und jedes Feature muss sich rechtfertigen
 - Kein Hack (kein DE-Shortcut-Workaround auf Wayland)
 
 ---
@@ -51,7 +65,7 @@ Auf GitHub gibt es Dutzende "WisprFlow-Clones", die meisten davon:
 
 ### Die Lösung: Murmel
 
-Ein **solider, wartbarer, privater Fork** auf Basis bewährter Open-Source-Technologie, der exakt die Features implementiert, die *du* brauchst — und nichts davon wird je an einen Server gesendet.
+Ein **solider, wartbarer, privater Fork** auf Basis bewährter Open-Source-Technologie, der exakt die Features implementiert, die _du_ brauchst — und nichts davon wird je an einen Server gesendet.
 
 ---
 
@@ -59,15 +73,15 @@ Ein **solider, wartbarer, privater Fork** auf Basis bewährter Open-Source-Techn
 
 ### Warum Handy?
 
-| Kriterium | Handy | OpenWhispr | nerd-dictation |
-|---|---|---|---|
-| **Lizenz** | MIT (permissiv, privat nutzbar) | MIT | GPL v3.0 (Copyleft) |
-| **Stack** | Rust (Tauri) + React | Electron + React | Python |
-| **Cross-Platform** | ✅ macOS, Windows, Linux | ✅ macOS, Windows, Linux | ❌ nur Linux |
-| **Stars** | 22.435 | 3.394 | ~500 |
-| **Aktivität** | Sehr aktiv (wöchentliche Commits) | Aktiv | Verlangsamt |
-| **Fork-Freundlichkeit** | 🟢 Modularer Rust-Core | 🟡 Komplexer Electron-Stack | 🟢 Einfach |
-| **Ressourcen** | 🟢 Gering (Tauri/Rust) | 🟡 Mittel (Electron) | 🟢 Gering |
+| Kriterium               | Handy                             | OpenWhispr                  | nerd-dictation      |
+| ----------------------- | --------------------------------- | --------------------------- | ------------------- |
+| **Lizenz**              | MIT (permissiv, privat nutzbar)   | MIT                         | GPL v3.0 (Copyleft) |
+| **Stack**               | Rust (Tauri) + React              | Electron + React            | Python              |
+| **Cross-Platform**      | ✅ macOS, Windows, Linux          | ✅ macOS, Windows, Linux    | ❌ nur Linux        |
+| **Stars**               | 22.435                            | 3.394                       | ~500                |
+| **Aktivität**           | Sehr aktiv (wöchentliche Commits) | Aktiv                       | Verlangsamt         |
+| **Fork-Freundlichkeit** | 🟢 Modularer Rust-Core            | 🟡 Komplexer Electron-Stack | 🟢 Einfach          |
+| **Ressourcen**          | 🟢 Gering (Tauri/Rust)            | 🟡 Mittel (Electron)        | 🟢 Gering           |
 
 Handy ist die **einzige Codebase**, die einen soliden, modularen Rust-Core für STT mitbringt, der unter MIT steht und aktiv gepflegt wird.
 
@@ -80,12 +94,25 @@ Handy ist die **einzige Codebase**, die einen soliden, modularen Rust-Core für 
 - **Text-Injection-Logik** — `xdotool` (X11), `wtype`/`ydotool` (Wayland), native Windows APIs
 - **SQLite-History** — Datenbank für Transkriptions-Verlauf
 - **Tauri-Grundgerüst** — Cross-Platform Desktop-App Framework
+- **LLM-Nachbearbeitung** — bereits vorhanden, siehe §5. Das war die angenehme
+  Überraschung beim Fork: die WisprFlow-artige Textveredelung muss nicht von null
+  gebaut werden.
 
-### Was von Handy entfernt wird
+### Was von Handy entfernt wurde (Stand: Rebranding-Commit)
 
-- **React-Frontend** — komplett entfernt, ersetzt durch ein natives, lightweight UI
-- **Raycast-Extension** — irrelevant für Linux/Windows
-- **Homebrew/winget-Pakete** — Murmel wird manuell gebaut und installiert
+- **Upstream-Branding** — Name, Wortmarke, App-Icon und Tray-Icons sind neu
+  (Upstream behält sich seine Markenassets ausdrücklich vor, siehe [NOTICE.md](NOTICE.md))
+- **Sponsoren, Discord, FUNDING** — gehören dem Upstream-Projekt
+- **Community-Governance** — Feature-Freeze, RFC-Prozess und Discussions-Pflicht
+  ergeben für ein Ein-Personen-Projekt keinen Sinn
+- **Raycast-Extension, Homebrew/winget** — irrelevant; Murmel wird selbst gebaut
+
+### Was noch offen ist
+
+- **React-Frontend** — steht noch (siehe §4.2 für die ehrliche Einordnung)
+- **Updater-Signaturschlüssel** — noch der öffentliche Schlüssel des Upstreams;
+  vor dem ersten Release durch ein eigenes Schlüsselpaar ersetzen
+- **macOS** — läuft technisch weiter mit, ist aber kein Zielsystem und wird nicht getestet
 
 ---
 
@@ -96,44 +123,177 @@ Handy ist die **einzige Codebase**, die einen soliden, modularen Rust-Core für 
 - **Warum Rust?** Memory-Safety, native Performance, keine Garbage-Collection-Pausen
 - **Warum Tauri?** Geringer Footprint (~600 KB Runtime vs. ~150 MB Electron), native System-Integration, Cross-Platform-Abstraktion für Fenster und System-Events
 
-### 4.2 Frontend: Kein React
+### 4.2 Frontend: klein halten — aber mit offenen Augen
 
-Statt React wird ein **ultra-leichtgewichtiges UI** verwendet:
+Das Ziel bleibt eine **kleine, elegante Custom-UI**. Der Weg dorthin verdient
+allerdings Ehrlichkeit, denn der Fork bringt deutlich mehr Frontend mit als
+ursprünglich angenommen:
 
-- **Option A: Tauri + Vanilla HTML/JS/CSS** — Die Tauri-API erlaubt direkten Zugriff auf Rust-Funktionen aus JS. Ein paar hundert Zeilen vanilla JS reichen für die Historie-Liste.
-- **Option B: Tauri + Leptos (Rust-WASM)** — Wenn du komplett auf JS verzichten willst. Leptos ist ein Rust-Frontend-Framework, das zu WASM kompiliert.
-- **Empfohlung:** Option A. Für eine einzige Liste mit Kopierknöpfen ist React Overkill. Vanilla JS + CSS reicht völlig.
+**Ist-Zustand:** React + Tailwind + Zustand, dazu Settings, Onboarding,
+Modell-Auswahl, Update-Checker, Debug-Panels und **i18n in 24 Sprachen**. Das ist
+kein „Bloat um des Bloats willen" — an dem UI hängt echte Funktionalität.
+
+**Die Spannung:** Ein kompletter Rauswurf von React bedeutet, all das
+nachzubauen — realistisch mehrere Wochen, mit dem Risiko, funktionierende Features
+zu verlieren. Das kollidiert mit dem Ziel, schnell zu einem täglich nutzbaren
+Werkzeug zu kommen.
+
+**Der gewählte Pfad — Reduktion statt Rewrite:**
+
+1. **Zuerst wegschneiden, was nicht gebraucht wird:** i18n auf Deutsch/Englisch
+   reduzieren, macOS-spezifische UI-Pfade entfernen, Onboarding auf das Nötigste
+   eindampfen. Das bringt den größten Effekt bei kleinstem Risiko.
+2. **Dann das Hauptfenster neu gestalten:** Historie als zentrale Ansicht (§7),
+   Einstellungen dahinter aufgeräumt.
+3. **Rewrite nur, wenn er sich dann noch lohnt.** Wenn nach Schritt 1 und 2 ein
+   schlankes, schnelles UI dasteht, ist die Framework-Frage zweitrangig — der
+   Nutzer sieht das Ergebnis, nicht die Dependency-Liste.
+
+**Falls doch ein Rewrite:** Vanilla HTML/JS/CSS über die Tauri-API. Leptos
+(Rust→WASM) wäre die puristische Variante, kauft aber eine zweite Lernkurve ein.
 
 ### 4.3 STT-Engine: Whisper.cpp + Parakeet V3
 
-| Modell | Nutzung | Vor- / Nachteil |
-|---|---|---|
-| **Whisper (Small/Medium/Large)** | GPU-beschleunigt | Sehr genau, braucht VRAM |
-| **Parakeet V3** | CPU-only | Schnell, automatische Spracherkennung, kein GPU nötig |
+| Modell                           | Nutzung          | Vor- / Nachteil                                       |
+| -------------------------------- | ---------------- | ----------------------------------------------------- |
+| **Whisper (Small/Medium/Large)** | GPU-beschleunigt | Sehr genau, braucht VRAM                              |
+| **Parakeet V3**                  | CPU-only         | Schnell, automatische Spracherkennung, kein GPU nötig |
 
 **Default:** Parakeet V3 (CPU-only, ~5x Echtzeit auf i5). Optional Whisper für maximale Genauigkeit auf Systemen mit GPU.
 
 ### 4.4 Audio-Pipeline
 
 ```
-Mikrofon → cpal → VAD (Silero) → STT (Whisper/Parakeet) → Text-Injection
+Mikrofon → cpal → VAD (Silero) → STT (Whisper/Parakeet) → [LLM-Nachbearbeitung] → Text-Injection
+                                                            └─ optional, §5
 ```
 
-Alles läuft lokal. Kein Byte verlässt den Rechner.
+Alles läuft lokal. Kein Byte verlässt den Rechner — vorausgesetzt, die
+Nachbearbeitung nutzt ein lokales Modell (siehe §5.2).
 
 ---
 
-## 5. Systemintegration
+## 5. Textveredelung — der WisprFlow-Teil
 
-### 5.1 Globale Hotkeys
+Das, was WisprFlow von einem reinen Diktiergerät unterscheidet: Gesprochenes wird
+nicht bloß transkribiert, sondern **aufgeräumt**. Füllwörter raus, Interpunktion
+rein, „ähm" weg, auf Wunsch in eine andere Tonalität umgeschrieben.
 
-| Plattform | Mechanismus | Status |
-|---|---|---|
-| **Windows** | Tauri `global-shortcut` Plugin | ✅ Nativ, out-of-the-box |
-| **Ubuntu 24.04 (X11)** | `rdev` + `xdotool` | ✅ Funktioniert |
-| **Ubuntu 24.04 (Wayland)** | **Native D-Bus-Anbindung** | 🟡 Muss gebaut werden |
+### 5.1 Was bereits da ist
 
-### 5.2 D-Bus für Wayland — Kein Hack
+Der Fork bringt eine vollständige Post-Processing-Pipeline mit — das war der
+größte Gewinn der Fork-Entscheidung:
+
+| Baustein                | Wo                            | Was es kann                                                                                          |
+| ----------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **LLM-Client**          | `src-tauri/src/llm_client.rs` | OpenAI-kompatible Chat-Completions, Structured Outputs, Reasoning-Abschaltung mit Provider-Fallbacks |
+| **Provider-Verwaltung** | `src-tauri/src/settings.rs`   | Mehrere Endpunkte parallel, API-Keys verschlüsselt abgelegt                                          |
+| **Prompt-System**       | `post_process_prompts`        | Frei definierbare Prompts, per Auswahl umschaltbar                                                   |
+| **Zweiter Hotkey**      | `--toggle-post-process`       | Diktat _mit_ Nachbearbeitung, getrennt vom normalen Diktat                                           |
+| **Historie**            | `transcription_history`       | Speichert Rohtext **und** nachbearbeiteten Text nebeneinander                                        |
+
+Ein Diktat kann also schon heute roh **oder** veredelt eingefügt werden — der
+Unterschied liegt nur am gedrückten Hotkey.
+
+### 5.2 Wohin es gehen soll
+
+**Lokal als Standard.** Unter den vorkonfigurierten Providern ist bereits
+**Ollama** (`http://localhost:11434/v1`). Das ist der Weg, der zur Privacy-Säule
+passt: ein kleines Instruct-Modell (z. B. Qwen3 4B oder Llama 3.2 3B) räumt den
+Text auf, ohne dass er den Rechner verlässt. Cloud-Provider bleiben möglich, sind
+aber bewusst nicht der Default.
+
+> **Konsequenz für das Manifest:** „Kein Netzwerk-Request" gilt uneingeschränkt nur
+> mit lokalem LLM. Wer einen Cloud-Provider konfiguriert, schickt Text an Dritte.
+> Murmel muss das in der UI **unmissverständlich** anzeigen — kein stilles Abfließen.
+
+**Prompt-Presets statt Prompt-Basteln.** Ein paar durchdachte Voreinstellungen
+schlagen ein leeres Textfeld:
+
+| Preset           | Zweck                                                                            |
+| ---------------- | -------------------------------------------------------------------------------- |
+| _Aufräumen_      | Füllwörter entfernen, Interpunktion setzen, Satzbau glätten — Inhalt unverändert |
+| _E-Mail_         | Anrede, Absätze, Grußformel                                                      |
+| _Notiz_          | Stichpunkte statt Fließtext                                                      |
+| _Code-Kommentar_ | Knapp, technisch, ohne Floskeln                                                  |
+| _Roh_            | Keine Nachbearbeitung (Fallback)                                                 |
+
+**Analyse, nicht nur Formatierung.** Der Structured-Output-Support im LLM-Client
+erlaubt mehr als Umschreiben: erkannte Sprache, Tonalität, Länge, offene Fragen im
+Diktat. Diese Metadaten fließen in die Statistiken (§6) — sie sind der Grund, warum
+sich Analyse und Auswertung gegenseitig tragen.
+
+---
+
+## 6. Nutzungsdaten — hübsch, aber ausschließlich lokal
+
+WisprFlow zeigt „du hast diese Woche X Wörter diktiert und Y Minuten gespart". Das
+macht Spaß und motiviert. Murmel soll das auch können — **ohne dass ein einziger
+Datenpunkt den Rechner verlässt**.
+
+### 6.1 Was erfasst wird
+
+Alles ergibt sich aus dem, was ohnehin passiert. Nichts wird zusätzlich beobachtet:
+
+| Kennzahl                    | Herkunft                                          |
+| --------------------------- | ------------------------------------------------- |
+| Wörter / Zeichen pro Diktat | Transkript                                        |
+| Diktatdauer                 | Aufnahmelänge                                     |
+| Sprechgeschwindigkeit (WPM) | Wörter ÷ Dauer                                    |
+| Verarbeitungszeit           | Zeitstempel der STT-Pipeline                      |
+| Verwendetes Modell          | Transkriptions-Manager                            |
+| Erkannte Sprache            | STT-Ausgabe                                       |
+| Nachbearbeitung genutzt?    | `post_process_requested` (existiert bereits)      |
+| Zeitersparnis (geschätzt)   | Wörter ÷ 40 WPM Tippgeschwindigkeit − Diktatdauer |
+
+### 6.2 Was das Schema dafür braucht
+
+Die History-Tabelle speichert heute Zeitstempel, Titel, Rohtext und
+nachbearbeiteten Text — aber keine Metriken. Nötig ist eine Migration
+(`src-tauri/src/managers/history.rs`, `MIGRATIONS`):
+
+```sql
+ALTER TABLE transcription_history ADD COLUMN duration_ms INTEGER;
+ALTER TABLE transcription_history ADD COLUMN word_count INTEGER;
+ALTER TABLE transcription_history ADD COLUMN processing_ms INTEGER;
+ALTER TABLE transcription_history ADD COLUMN model_used TEXT;
+ALTER TABLE transcription_history ADD COLUMN language TEXT;
+```
+
+Das Migrationssystem ist additiv — bestehende Einträge bekommen `NULL` und die
+Statistik rechnet sie schlicht nicht mit.
+
+### 6.3 Wie es aussehen soll
+
+Ein **Insights**-Bereich im Hauptfenster, bewusst zurückhaltend:
+
+- Wörter pro Tag/Woche, als schlichter Balkenverlauf
+- Kumulierte geschätzte Zeitersparnis („diesen Monat 2 h 14 min")
+- Aktivste Tageszeit
+- Meistgenutztes Modell und dessen Durchschnittsgeschwindigkeit
+- Verhältnis roh zu nachbearbeitet
+
+**Regeln, die nicht verhandelbar sind:**
+
+1. **Keine Telemetrie.** Kein Opt-in, keine anonymisierte Übermittlung, gar nichts.
+   Der Upstream hatte „Opt-in Analytics" auf der Roadmap — für Murmel ist das gestrichen.
+2. **Vollständig exportierbar.** JSON oder CSV, ein Klick.
+3. **Vollständig löschbar.** Statistiken zurücksetzen, ohne die Historie zu verlieren
+   — und umgekehrt.
+
+---
+
+## 7. Systemintegration
+
+### 7.1 Globale Hotkeys
+
+| Plattform                  | Mechanismus                    | Status                   |
+| -------------------------- | ------------------------------ | ------------------------ |
+| **Windows**                | Tauri `global-shortcut` Plugin | ✅ Nativ, out-of-the-box |
+| **Ubuntu 24.04 (X11)**     | `rdev` + `xdotool`             | ✅ Funktioniert          |
+| **Ubuntu 24.04 (Wayland)** | **Native D-Bus-Anbindung**     | 🟡 Muss gebaut werden    |
+
+### 7.2 D-Bus für Wayland — Kein Hack
 
 Auf Wayland (Ubuntu 24.04 Default) können Anwendungen **keine globalen Hotkeys** direkt abfangen. Das ist ein Sicherheitsfeature von Wayland.
 
@@ -149,6 +309,7 @@ Auf Wayland (Ubuntu 24.04 Default) können Anwendungen **keine globalen Hotkeys*
 D-Bus ist der **offizielle IPC-Mechanismus** von Linux-Desktops. GNOME, KDE und alle anderen DEs nutzen D-Bus intern für genau solche Zwecke. Das ist die von den Desktop-Entwicklern vorgesehene Art, globale Aktionen zu triggern — nicht ein Workaround, sondern die korrekte Architektur.
 
 **Beispiel GNOME-Shortcut:**
+
 ```bash
 # In GNOME Settings > Keyboard > Custom Shortcuts
 gdbus call --session --dest org.murmel.app --object-path /org/murmel/app --method org.murmel.app.ToggleTranscription
@@ -156,23 +317,24 @@ gdbus call --session --dest org.murmel.app --object-path /org/murmel/app --metho
 
 **Alternative:** Murmel könnte bei der Installation eine `.desktop`-Datei mit `Actions=` definieren, die über D-Bus ansprechbar sind.
 
-### 5.3 Text-Injection (Pasten)
+### 7.3 Text-Injection (Pasten)
 
-| Plattform | Mechanismus |
-|---|---|
-| **Windows** | Native Win32 API (`SendInput` oder Clipboard + `Ctrl+V`) |
-| **Linux X11** | `xdotool` oder `enigo` |
-| **Linux Wayland** | `ydotool` (systemd-Service) oder `dotool` |
+| Plattform         | Mechanismus                                              |
+| ----------------- | -------------------------------------------------------- |
+| **Windows**       | Native Win32 API (`SendInput` oder Clipboard + `Ctrl+V`) |
+| **Linux X11**     | `xdotool` oder `enigo`                                   |
+| **Linux Wayland** | `ydotool` (systemd-Service) oder `dotool`                |
 
 **Wichtig für Ubuntu 24.04:** `wtype` funktioniert auf Ubuntu 24.04 Wayland **nicht**. `ydotool` ist erforderlich und muss als systemd-Service laufen. cite🛠web_search:1#2:~:text=Ubuntu 26.04: Has Wayland display server by default. wtype does not work, you need to install ydotool and configure systemd
 
 Die Text-Injection-Logik aus Handy (`enigo` als Fallback, `xdotool`/`ydotool` als Primary) wird übernommen und an Murmel angepasst.
 
-### 5.4 Overlay — Minimalistisch & Verschiebbar
+### 7.4 Overlay — Minimalistisch & Verschiebbar
 
 WisprFlow's Overlay ist nicht verschiebbar — das ist nervig.
 
 Murmel's Overlay:
+
 - **Nur bei aktiver Aufnahme sichtbar**
 - **Verschiebbar** per Drag (Tauri-Fenster mit `always-on-top` + `drag` Events)
 - **Position wird gespeichert** (per Session oder persistent in SQLite)
@@ -182,7 +344,7 @@ Murmel's Overlay:
 
 ---
 
-## 6. UI-Philosophie: Ein Fenster, eine Aufgabe
+## 8. UI-Philosophie: Ein Fenster, eine Aufgabe
 
 ### Das Hauptfenster (Historie)
 
@@ -217,6 +379,7 @@ Ein einziges App-Fenster. Keine Tabs, keine Seiten, keine Einstellungen-Seite (d
 ### Kein React
 
 Stattdessen:
+
 - **HTML5** für Struktur
 - **Vanilla JavaScript** für Interaktivität (Tauri-Invoke für Rust-Calls)
 - **CSS** für Styling (kein Tailwind, kein Bootstrap — pure CSS-Variablen für Dark/Light Mode)
@@ -225,87 +388,158 @@ Das gesamte Frontend sind voraussichtlich **< 500 Zeilen Code**.
 
 ---
 
-## 7. Datenmodell (SQLite)
+## 9. Datenmodell (SQLite)
+
+**Ist-Zustand** (`src-tauri/src/managers/history.rs`, migriert über `rusqlite_migration`):
 
 ```sql
-CREATE TABLE transcripts (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    text        TEXT NOT NULL,
-    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-    language    TEXT,           -- erkannte Sprache
-    model       TEXT,           -- verwendetes Modell
-    duration_ms INTEGER,        -- Diktat-Dauer
-    confidence  REAL            -- optional: Konfidenz-Score
+CREATE TABLE transcription_history (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_name               TEXT NOT NULL,      -- zugehörige Audiodatei
+    timestamp               INTEGER NOT NULL,
+    saved                   BOOLEAN NOT NULL DEFAULT 0,
+    title                   TEXT NOT NULL,
+    transcription_text      TEXT NOT NULL,      -- Rohtranskript
+    post_processed_text     TEXT,               -- veredelte Fassung (§5)
+    post_process_prompt     TEXT,               -- verwendeter Prompt
+    post_process_requested  BOOLEAN NOT NULL DEFAULT 0
 );
-
-CREATE INDEX idx_created_at ON transcripts(created_at);
-CREATE VIRTUAL TABLE transcripts_fts USING fts5(text);
 ```
 
-**Privacy:** Die Datenbank liegt lokal unter:
-- Windows: `%APPDATA%\Murmel\murmel.db`
-- Linux: `~/.config/murmel/murmel.db`
+**Geplante Ergänzungen** für die Statistiken (§6.2): `duration_ms`, `word_count`,
+`processing_ms`, `model_used`, `language`.
 
-Kein Sync. Kein Backup in die Cloud. Wenn du willst, exportierst du als `.txt` oder `.json`.
+**Noch offen:** Volltextsuche. `fts5` über `transcription_text` wäre die naheliegende
+Lösung, sobald die Historie mehr als ein paar hundert Einträge hat.
+
+**Privacy:** Die Datenbank liegt lokal im App-Data-Verzeichnis:
+
+- Windows: `%APPDATA%\com.suppenterrine.murmel\`
+- Linux: `~/.local/share/com.suppenterrine.murmel/`
+
+Kein Sync. Kein Backup in die Cloud. Export als `.txt` oder `.json` auf Wunsch.
 
 ---
 
-## 8. Roadmap
+## 10. Android — der Fernblick
 
-### Phase 1: MVP (Woche 1–2)
-- [ ] Fork von Handy erstellen
-- [ ] React-Frontend entfernen
-- [ ] Vanilla-JS-Historie-Fenster bauen
-- [ ] Globaler Hotkey für Diktat (Windows: nativ, Linux: D-Bus)
-- [ ] Text-Injection (Windows + Linux X11)
-- [ ] Parakeet V3 als Default-Modell
+Diktieren soll nicht am Schreibtisch aufhören. Das Ziel: dieselbe Erfahrung auf dem
+Telefon, mit denselben Prinzipien (lokal, privat, ohne Konto).
 
-### Phase 2: Polish (Woche 3–4)
-- [ ] Verschiebbares Overlay
-- [ ] D-Bus-Service für Wayland (Ubuntu 24.04)
+### 10.1 Was dafür spricht
+
+Tauri 2 unterstützt Android offiziell, und der Fork bringt die Icon-Struktur dafür
+bereits mit (`src-tauri/icons/android/`). Der Rust-Kern — Audio, VAD, STT,
+Post-Processing — ist plattformunabhängig geschrieben.
+
+### 10.2 Was dagegen spricht — ehrlich betrachtet
+
+Der Desktop-Weg lässt sich **nicht** direkt übertragen:
+
+| Problem                    | Warum es auf Android nicht funktioniert                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Globale Hotkeys**        | Gibt es nicht. Android kennt keine systemweiten Tastenkürzel für Apps.                                                                                  |
+| **Text-Injection**         | `enigo`/`xdotool`/`SendInput` existieren nicht. Text in fremde Apps zu schreiben geht **nur** über eine Input Method (IME) — also eine eigene Tastatur. |
+| **Audio-Stack**            | `cpal` unterstützt Android eingeschränkt; realistisch braucht es Oboe/AAudio über JNI.                                                                  |
+| **Modellgröße**            | Parakeet V3 (~478 MB) ist für ein Telefon grenzwertig. Moonshine Tiny/Base sind die realistischeren Kandidaten.                                         |
+| **Hintergrund-Ausführung** | Aggressives Doze/Battery-Management; ein dauerlaufender Dienst braucht eine Foreground-Notification.                                                    |
+
+### 10.3 Der wahrscheinliche Weg
+
+**Murmel Android ist keine Portierung, sondern ein eigenständiger Client:**
+
+1. **Als Tastatur (IME), nicht als App-mit-Fenster.** Eine Mikrofontaste in der
+   Tastatur ist der einzige Weg, der systemweit in jedes Textfeld schreibt — und
+   nebenbei genau das UX-Modell, das WisprFlow auf dem Handy nutzt.
+2. **Kleines Modell, on-device.** Moonshine oder Whisper Tiny, quantisiert.
+3. **Gemeinsamer Rust-Kern, getrennte Oberfläche.** Die Transkriptionspipeline als
+   Rust-Bibliothek über JNI; die Tastatur selbst nativ in Kotlin.
+4. **Optional: Kopplung an den Desktop.** Historie und Statistiken über das lokale
+   Netz synchronisieren — nur wenn es ohne fremden Server geht.
+
+**Einordnung:** Das ist ein **eigenes Projekt in Murmel-Kleidung**, kein Nebenprodukt.
+Erst angehen, wenn Windows und Ubuntu wirklich rundlaufen.
+
+---
+
+## 11. Roadmap
+
+### Phase 0: Fork-Übernahme ✅
+
+- [x] Fork von Handy erstellen
+- [x] Vollständiges Rebranding auf Murmel (Code, UI, Icons, Doku)
+- [x] Eigenes Branding: Wortmarke, App-Icon, Tray-Icon-Set
+- [x] MIT-Attribution und Herkunftsdokumentation ([NOTICE.md](NOTICE.md))
+
+### Phase 1: Windows-Alltagstauglichkeit
+
+- [ ] Build und Start auf Windows verifizieren
+- [ ] Hotkeys einrichten (Diktat + Diktat-mit-Nachbearbeitung)
+- [ ] Parakeet V3 als Default-Modell setzen
+- [ ] Startzeit und Transkriptionsgeschwindigkeit messen (Baseline)
+- [ ] Eigenen Updater-Signaturschlüssel erzeugen
+
+### Phase 2: Murmel wird Murmel
+
+- [ ] Lokales LLM (Ollama) als Default-Provider für die Nachbearbeitung
+- [ ] Prompt-Presets statt freiem Textfeld (§5.2)
+- [ ] Deutliche UI-Kennzeichnung, wenn ein Cloud-Provider aktiv ist
+- [ ] History-Migration um Metrik-Spalten erweitern (§6.2)
+- [ ] Insights-Ansicht: Wörter, Zeitersparnis, Modell-Performance (§6.3)
+- [ ] UI-Reduktion: i18n auf DE/EN, Onboarding eindampfen (§4.2)
+
+### Phase 3: Ubuntu 24.04
+
+- [ ] Build auf Ubuntu 24.04 verifizieren
+- [ ] Text-Injection über X11 (`xdotool`)
+- [ ] D-Bus-Service für Wayland-Hotkeys (§7.2)
 - [ ] `ydotool`-Integration für Wayland-Pasten
-- [ ] Audio-Feedback (Piepton bei Start/Stop)
-- [ ] Dark/Light Mode
+- [ ] Verschiebbares Overlay mit gespeicherter Position
 
-### Phase 3: Erweiterungen (Woche 5+)
-- [ ] Whisper-Modelle (GPU-beschleunigt)
-- [ ] Einstellungen-UI
-- [ ] Export-Funktion (JSON/TXT)
-- [ ] Sprach-spezifische Modelle
-- [ ] Optional: Sprachbefehle ("Neuer Absatz", "Punkt", "Komma")
+### Phase 4: Android
+
+- [ ] Machbarkeitsstudie: Rust-Kern über JNI auf Android
+- [ ] IME-Prototyp mit Mikrofontaste
+- [ ] Kleines On-Device-Modell (Moonshine/Whisper Tiny)
+
+### Irgendwann, vielleicht
+
+- [ ] Volltextsuche über die Historie (`fts5`)
+- [ ] Sprachbefehle („Neuer Absatz", „Punkt", „Komma")
+- [ ] Export der Statistiken als JSON/CSV
 
 ---
 
-## 9. Referenzen & Quellen
+## 12. Referenzen & Quellen
 
 ### Basis-Projekte
 
-| Projekt | Repo | Lizenz | Stars (Stand: Aug 2026) |
-|---|---|---|---|
-| **Handy** | `github.com/cjpais/Handy` | MIT | 22.435 |
-| **OpenWhispr** | `github.com/OpenWhispr/openwhispr` | MIT | 3.394 |
-| **nerd-dictation** | `github.com/ideasman42/nerd-dictation` | GPL v3.0 | ~500 |
-| **Speech Note (dsnote)** | `github.com/mkiol/dsnote` | MPL 2.0 | ~2.000 |
+| Projekt                  | Repo                                   | Lizenz   | Stars (Stand: Aug 2026) |
+| ------------------------ | -------------------------------------- | -------- | ----------------------- |
+| **Handy**                | `github.com/cjpais/Handy`              | MIT      | 22.435                  |
+| **OpenWhispr**           | `github.com/OpenWhispr/openwhispr`     | MIT      | 3.394                   |
+| **nerd-dictation**       | `github.com/ideasman42/nerd-dictation` | GPL v3.0 | ~500                    |
+| **Speech Note (dsnote)** | `github.com/mkiol/dsnote`              | MPL 2.0  | ~2.000                  |
 
 ### Abandoned Clones (nicht nutzbar)
 
-| Projekt | Repo | Letzter Commit |
-|---|---|---|
-| **whisper-writer** | `github.com/savbell/whisper-writer` | August 2024 |
-| **whisper-dictation** | `github.com/foges/whisper-dictation` | Juni 2024 |
+| Projekt               | Repo                                 | Letzter Commit |
+| --------------------- | ------------------------------------ | -------------- |
+| **whisper-writer**    | `github.com/savbell/whisper-writer`  | August 2024    |
+| **whisper-dictation** | `github.com/foges/whisper-dictation` | Juni 2024      |
 
 ### Technologien
 
-| Komponente | Zweck | Repo |
-|---|---|---|
-| **Tauri** | Cross-Platform Desktop-Framework | `github.com/tauri-apps/tauri` |
-| **whisper.cpp** | Lokale STT-Inference | `github.com/ggerganov/whisper.cpp` |
-| **cpal** | Cross-Platform Audio I/O | `github.com/RustAudio/cpal` |
-| **enigo** | Cross-Platform Text-Injection | `github.com/enigo-rs/enigo` |
-| **rdev** | Globale Hotkeys (X11/macOS/Windows) | `github.com/Narsil/rdev` |
-| **Silero VAD** | Voice Activity Detection | `github.com/snakers4/silero-vad` |
-| **Parakeet** | NVIDIA CPU-optimiertes STT-Modell | `github.com/NVIDIA/NeMo` |
-| **D-Bus (zbus)** | Rust D-Bus-Client/Server | `github.com/dbus2/zbus` |
+| Komponente       | Zweck                               | Repo                               |
+| ---------------- | ----------------------------------- | ---------------------------------- |
+| **Tauri**        | Cross-Platform Desktop-Framework    | `github.com/tauri-apps/tauri`      |
+| **whisper.cpp**  | Lokale STT-Inference                | `github.com/ggerganov/whisper.cpp` |
+| **cpal**         | Cross-Platform Audio I/O            | `github.com/RustAudio/cpal`        |
+| **enigo**        | Cross-Platform Text-Injection       | `github.com/enigo-rs/enigo`        |
+| **rdev**         | Globale Hotkeys (X11/macOS/Windows) | `github.com/Narsil/rdev`           |
+| **Silero VAD**   | Voice Activity Detection            | `github.com/snakers4/silero-vad`   |
+| **Parakeet**     | NVIDIA CPU-optimiertes STT-Modell   | `github.com/NVIDIA/NeMo`           |
+| **D-Bus (zbus)** | Rust D-Bus-Client/Server            | `github.com/dbus2/zbus`            |
 
 ### Dokumentation
 
@@ -316,18 +550,23 @@ Kein Sync. Kein Backup in die Cloud. Wenn du willst, exportierst du als `.txt` o
 
 ---
 
-## 10. Design-Prinzipien (Murmel-Manifest)
+## 13. Design-Prinzipien (Murmel-Manifest)
 
-1. **Privacy by Design** — Kein Netzwerk-Request, keine Telemetrie, keine Cloud
+1. **Privacy by Design** — Keine Telemetrie, kein Cloud-Sync, keine Analytics.
+   Netzwerk nur für den einmaligen Modell-Download und den Update-Check. Wer
+   bewusst einen Cloud-LLM-Provider konfiguriert, tut das sehenden Auges — die UI
+   sagt es klar (§5.2).
 2. **No Bloat** — Jedes Feature muss sich rechtfertigen. Wenn es nicht essenziell ist, kommt es nicht rein.
 3. **No Hacks** — Wayland-Hotkeys über D-Bus, nicht über Workarounds. Text-Injection über offizielle APIs.
-4. **One Window** — Ein App-Fenster für alles. Keine Popups, keine Wizard, keine Onboarding-Tours.
-5. **Offline First** — Alles funktioniert ohne Internet. Modelle werden einmalig heruntergeladen und bleiben lokal.
-6. **Cross-Platform** — Windows und Ubuntu 24.04 sind gleichberechtigte First-Class-Citizens.
-7. **Fork-Friendly** — Der Code ist so geschrieben, dass ein zukünftiges Ich (oder jemand anderes) ihn in 2 Jahren noch versteht.
+4. **One Window** — Ein App-Fenster für alles. Keine Popups, keine Wizards, keine Onboarding-Tours.
+5. **Offline First** — Alles Wesentliche funktioniert ohne Internet. Modelle werden einmalig heruntergeladen und bleiben lokal.
+6. **Windows zuerst, Ubuntu gleichberechtigt** — Windows ist der Alltagsrechner und gibt das Tempo vor; Ubuntu 24.04 wird nicht nachgereicht, sondern mitgeführt. Android ist ein eigenes Kapitel (§10). macOS läuft mit, wird aber nicht gepflegt.
+7. **Deine Daten bleiben deine** — Historie und Statistiken liegen lokal, sind vollständig exportierbar und vollständig löschbar (§6.3).
+8. **Fork-Friendly** — Der Code ist so geschrieben, dass ein zukünftiges Ich (oder jemand anderes) ihn in 2 Jahren noch versteht.
+9. **Ehrlich zum Upstream** — Übernommenes wird als übernommen gekennzeichnet, Attribution bleibt erhalten, fremde Markenassets werden nicht mitgeschleppt ([NOTICE.md](NOTICE.md)).
 
 ---
 
-> *"Ich murmle, also bin ich."*
+> _"Ich murmle, also bin ich."_
 >
 > — Murmel, 2026

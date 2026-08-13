@@ -390,7 +390,7 @@ mod imp {
         }
 
         let carbon_hotkey = handy_keys::Hotkey::new(widened, hotkey.key).ok()?;
-        Some((carbon_hotkey.to_handy_string(), degraded))
+        Some((carbon_hotkey.to_murmel_string(), degraded))
     }
 
     /// Register one vulnerable binding through Carbon. `fallback` is local

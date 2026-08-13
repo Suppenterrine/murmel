@@ -1,65 +1,55 @@
-# Handy
+# Murmel
 
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/WVBeWsNXK4)
+**Ein persönlicher, lokal laufender Diktier-Assistent. Kein SaaS, kein Cloud-Zwang.**
 
-**A free, open source, and extensible speech-to-text application that works completely offline.**
+Taste drücken, sprechen, Text landet am Cursor — in jeder Anwendung, ohne dass ein
+Byte den Rechner verlässt. Murmel ist ein privater Fork von
+[Handy](https://github.com/cjpais/Handy) und verfolgt eine eigene Vision:
+siehe **[Murmel_Northstar.md](Murmel_Northstar.md)**.
 
-Handy is a cross-platform desktop application that provides simple, privacy-focused speech transcription. Press a shortcut, speak, and have your words appear in any text field. This happens on your own computer without sending any information to the cloud.
+> **Status:** Frisch geforkt. Das Rebranding steht, die Murmel-eigenen Features
+> (Text-Nachbearbeitung per LLM, lokale Nutzungsstatistiken, schlankeres UI) sind
+> in Arbeit. Es gibt noch keine veröffentlichten Releases — Murmel wird selbst gebaut.
 
-## Why Handy?
+## Warum ein eigener Fork?
 
-Handy was created to fill the gap for a truly open source, extensible speech-to-text tool. As stated on [handy.computer](https://handy.computer):
+- **Privat** — keine Telemetrie, kein Cloud-Sync, keine Netzwerk-Requests außer dem
+  einmaligen Modell-Download
+- **Schnell auf Windows** — der Alltagsrechner ist Windows; Ubuntu 24.04 ist
+  gleichberechtigtes Ziel
+- **Unaufdringlich** — da, wenn man ihn braucht, unsichtbar, wenn nicht
+- **Wartbar** — solide Rust/Tauri-Basis statt Python-Skript ohne Tests
 
-- **Free**: Accessibility tooling belongs in everyone's hands, not behind a paywall
-- **Open Source**: Together we can build further. Extend Handy for yourself and contribute to something bigger
-- **Private**: Your voice stays on your computer. Get transcriptions without sending audio to the cloud
-- **Simple**: One tool, one job. Transcribe what you say and put it into a text box
+## Wie es funktioniert
 
-Handy isn't trying to be the best speech-to-text app—it's trying to be the most forkable one.
+1. **Hotkey drücken** (Toggle oder Push-to-Talk)
+2. **Sprechen**
+3. **Loslassen** — Murmel transkribiert lokal
+4. **Fertig** — der Text wird in die aktive Anwendung eingefügt
 
-## How It Works
+Die gesamte Verarbeitung ist lokal:
 
-1. **Press** a configurable keyboard shortcut to start/stop recording (or use push-to-talk mode)
-2. **Speak** your words while the shortcut is active
-3. **Release** and Handy processes your speech using Whisper
-4. **Get** your transcribed text pasted directly into whatever app you're using
-
-The process is entirely local:
-
-- Silence is filtered using VAD (Voice Activity Detection) with Silero
-- Transcription uses your choice of models:
-  - **Whisper models** (Small/Medium/Turbo/Large) with GPU acceleration when available
-  - **Parakeet V3** - CPU-optimized model with excellent performance and automatic language detection
-- Works on Windows, macOS, and Linux
+- Stille wird per VAD (Silero) herausgefiltert
+- Transkription wahlweise mit **Whisper** (GPU-beschleunigt) oder
+  **Parakeet V3** (CPU-optimiert, automatische Spracherkennung)
+- Läuft auf Windows, Linux und macOS
 
 ## Quick Start
 
-### Installation
+Es gibt noch keine Binaries — Murmel wird aus dem Quellcode gebaut:
 
-1. Download the latest release from the [releases page](https://github.com/cjpais/Handy/releases) or the [website](https://handy.computer)
-   - **macOS**: Also available via [Homebrew cask](https://formulae.brew.sh/cask/handy): `brew install --cask handy`
-   - **Windows**: Also available via [winget](https://github.com/microsoft/winget-pkgs): `winget install cjpais.Handy` \
-     **Note:** The Homebrew cask and winget package are not maintained by the Handy developers.
-2. Install the application
-3. Launch Handy and grant necessary system permissions (microphone, accessibility)
-4. Configure your preferred keyboard shortcuts in Settings
-5. Start transcribing!
+```bash
+bun install
+mkdir -p src-tauri/resources/models
+curl -o src-tauri/resources/models/silero_vad_v4.onnx https://blob.handy.computer/silero_vad_v4.onnx
+bun run tauri dev
+```
 
-### Development Setup
-
-For detailed build instructions including platform-specific requirements, see [BUILD.md](BUILD.md).
-
-## Integrations
-
-<a href="https://www.raycast.com/mattiacolombomc/handy" title="Install Handy Raycast Extension"><img src="https://www.raycast.com/mattiacolombomc/handy/install_button@2x.png?v=1.1" height="64" style="height: 64px;" alt="Install handy Raycast Extension" /></a>
-
-Control Handy from [Raycast](https://www.raycast.com) — start/stop recording, browse transcript history, manage dictionary, switch models and languages.
-
-[Source](https://github.com/mattiacolombomc/raycast-handy) · by [@mattiacolombomc](https://github.com/mattiacolombomc)
+Plattformspezifische Build-Voraussetzungen stehen in [BUILD.md](BUILD.md).
 
 ## Architecture
 
-Handy is built as a Tauri application combining:
+Murmel is built as a Tauri application combining:
 
 - **Frontend**: React + TypeScript with Tailwind CSS for the settings UI
 - **Backend**: Rust for system integration, audio processing, and ML inference
@@ -73,47 +63,47 @@ Handy is built as a Tauri application combining:
 
 ### Debug Mode
 
-Handy includes an advanced debug mode for development and troubleshooting. Access it by pressing:
+Murmel includes an advanced debug mode for development and troubleshooting. Access it by pressing:
 
 - **macOS**: `Cmd+Shift+D`
 - **Windows/Linux**: `Ctrl+Shift+D`
 
 ### CLI Parameters
 
-Handy supports command-line flags for controlling a running instance and customizing startup behavior. These work on all platforms (macOS, Windows, Linux).
+Murmel supports command-line flags for controlling a running instance and customizing startup behavior. These work on all platforms (macOS, Windows, Linux).
 
 **Remote control flags** (sent to an already-running instance via the single-instance plugin):
 
 ```bash
-handy --toggle-transcription    # Toggle recording on/off
-handy --toggle-post-process     # Toggle recording with post-processing on/off
-handy --cancel                  # Cancel the current operation
+murmel --toggle-transcription    # Toggle recording on/off
+murmel --toggle-post-process     # Toggle recording with post-processing on/off
+murmel --cancel                  # Cancel the current operation
 ```
 
 **Startup flags:**
 
 ```bash
-handy --start-hidden            # Start without showing the main window
-handy --no-tray                 # Start without the system tray icon
-handy --debug                   # Enable debug mode with verbose logging
-handy --help                    # Show all available flags
+murmel --start-hidden            # Start without showing the main window
+murmel --no-tray                 # Start without the system tray icon
+murmel --debug                   # Enable debug mode with verbose logging
+murmel --help                    # Show all available flags
 ```
 
 Flags can be combined for autostart scenarios:
 
 ```bash
-handy --start-hidden --no-tray
+murmel --start-hidden --no-tray
 ```
 
-> **macOS tip:** When Handy is installed as an app bundle, invoke the binary directly:
+> **macOS tip:** When Murmel is installed as an app bundle, invoke the binary directly:
 >
 > ```bash
-> /Applications/Handy.app/Contents/MacOS/Handy --toggle-transcription
+> /Applications/Murmel.app/Contents/MacOS/Murmel --toggle-transcription
 > ```
 
 ## Known Issues & Current Limitations
 
-This project is actively being developed and has some [known issues](https://github.com/cjpais/Handy/issues). We believe in transparency about the current state:
+This project is actively being developed and has some [known issues](https://github.com/Suppenterrine/murmel/issues). We believe in transparency about the current state:
 
 ### Major Issues (Help Wanted)
 
@@ -145,12 +135,12 @@ For reliable text input on Linux, install the appropriate tool for your display 
 - **Wayland**: Install `wtype` (preferred) or `dotool` for text input to work correctly
 - **dotool setup**: Requires adding your user to the `input` group: `sudo usermod -aG input $USER` (then log out and back in)
 
-Without these tools, Handy falls back to enigo which may have limited compatibility, especially on Wayland.
+Without these tools, Murmel falls back to enigo which may have limited compatibility, especially on Wayland.
 
 **Other Notes:**
 
 - **Runtime library dependency (`libgtk-layer-shell.so.0`)**:
-  - Handy links `gtk-layer-shell` on Linux. If startup fails with `error while loading shared libraries: libgtk-layer-shell.so.0`, install the runtime package for your distro:
+  - Murmel links `gtk-layer-shell` on Linux. If startup fails with `error while loading shared libraries: libgtk-layer-shell.so.0`, install the runtime package for your distro:
 
     | Distro        | Package to install    | Example command                        |
     | ------------- | --------------------- | -------------------------------------- |
@@ -160,31 +150,31 @@ Without these tools, Handy falls back to enigo which may have limited compatibil
 
   - For building from source on Ubuntu/Debian, you may also need `libgtk-layer-shell-dev`.
 
-- The recording overlay is disabled by default on Linux (`Overlay Position: None`) because certain compositors treat it as the active window. When the overlay is visible it can steal focus, which prevents Handy from pasting back into the application that triggered transcription. If you enable the overlay anyway, be aware that clipboard-based pasting might fail or end up in the wrong window.
+- The recording overlay is disabled by default on Linux (`Overlay Position: None`) because certain compositors treat it as the active window. When the overlay is visible it can steal focus, which prevents Murmel from pasting back into the application that triggered transcription. If you enable the overlay anyway, be aware that clipboard-based pasting might fail or end up in the wrong window.
 - If you are having trouble with the app, running with the environment variable `WEBKIT_DISABLE_DMABUF_RENDERER=1` may help
-- If Handy fails to start reliably on Linux, see [Troubleshooting → Linux Startup Crashes or Instability](#linux-startup-crashes-or-instability).
+- If Murmel fails to start reliably on Linux, see [Troubleshooting → Linux Startup Crashes or Instability](#linux-startup-crashes-or-instability).
 - **Global keyboard shortcuts (Wayland):** On Wayland, system-level shortcuts must be configured through your desktop environment or window manager. Use the [CLI flags](#cli-parameters) as the command for your custom shortcut.
 
   **GNOME:**
   1. Open **Settings > Keyboard > Keyboard Shortcuts > Custom Shortcuts**
   2. Click the **+** button to add a new shortcut
-  3. Set the **Name** to `Toggle Handy Transcription`
-  4. Set the **Command** to `handy --toggle-transcription`
+  3. Set the **Name** to `Toggle Murmel Transcription`
+  4. Set the **Command** to `murmel --toggle-transcription`
   5. Click **Set Shortcut** and press your desired key combination (e.g., `Super+O`)
 
   **KDE Plasma:**
   1. Open **System Settings > Shortcuts > Custom Shortcuts**
   2. Click **Edit > New > Global Shortcut > Command/URL**
-  3. Name it `Toggle Handy Transcription`
+  3. Name it `Toggle Murmel Transcription`
   4. In the **Trigger** tab, set your desired key combination
-  5. In the **Action** tab, set the command to `handy --toggle-transcription`
+  5. In the **Action** tab, set the command to `murmel --toggle-transcription`
 
   **Sway / i3:**
 
   Add to your config file (`~/.config/sway/config` or `~/.config/i3/config`):
 
   ```ini
-  bindsym $mod+o exec handy --toggle-transcription
+  bindsym $mod+o exec murmel --toggle-transcription
   ```
 
   **Hyprland:**
@@ -192,26 +182,26 @@ Without these tools, Handy falls back to enigo which may have limited compatibil
   Add to your config file (`~/.config/hypr/hyprland.conf`):
 
   ```ini
-  bind = $mainMod, O, exec, handy --toggle-transcription
+  bind = $mainMod, O, exec, murmel --toggle-transcription
   ```
 
-- You can also trigger Handy externally via Unix signals or the CLI flags, which lets Wayland window managers or other hotkey daemons keep ownership of keybindings:
+- You can also trigger Murmel externally via Unix signals or the CLI flags, which lets Wayland window managers or other hotkey daemons keep ownership of keybindings:
 
-  | Action                                    | Trigger                                                  |
-  | ----------------------------------------- | -------------------------------------------------------- |
-  | Toggle transcription                      | `pkill -USR2 -n handy` or `handy --toggle-transcription` |
-  | Toggle transcription with post-processing | `handy --toggle-post-process`                            |
+  | Action                                    | Trigger                                                    |
+  | ----------------------------------------- | ---------------------------------------------------------- |
+  | Toggle transcription                      | `pkill -USR2 -n murmel` or `murmel --toggle-transcription` |
+  | Toggle transcription with post-processing | `murmel --toggle-post-process`                             |
 
   Example Sway config:
 
   ```ini
-  bindsym $mod+o exec pkill -USR2 -n handy
-  bindsym $mod+p exec handy --toggle-post-process
+  bindsym $mod+o exec pkill -USR2 -n murmel
+  bindsym $mod+p exec murmel --toggle-post-process
   ```
 
   `pkill` here simply delivers the signal—it does not terminate the process.
 
-  > **Behavior change:** older releases also accepted `SIGUSR1` for toggling transcription with post-processing. WebKitGTK — the webview engine embedded in Handy on Linux — uses SIGUSR1 internally to coordinate JavaScript garbage collection, so listening for it caused phantom recordings and interrupted dictations every few minutes ([#1660](https://github.com/cjpais/Handy/issues/1660)). Handy no longer listens for SIGUSR1 on Linux; the post-processing toggle is still available via `handy --toggle-post-process`. **Remove any `pkill -USR1` bindings**: the signal is now delivered straight to WebKit's internal handler and can crash the app.
+  > **Behavior change:** older releases also accepted `SIGUSR1` for toggling transcription with post-processing. WebKitGTK — the webview engine embedded in Murmel on Linux — uses SIGUSR1 internally to coordinate JavaScript garbage collection, so listening for it caused phantom recordings and interrupted dictations every few minutes ([#1660](https://github.com/cjpais/Handy/issues/1660)). Murmel no longer listens for SIGUSR1 on Linux; the post-processing toggle is still available via `murmel --toggle-post-process`. **Remove any `pkill -USR1` bindings**: the signal is now delivered straight to WebKit's internal handler and can crash the app.
 
 **Overlay & Pasting Issues (Linux):**
 
@@ -228,7 +218,7 @@ Without these tools, Handy falls back to enigo which may have limited compatibil
 
 ### System Requirements/Recommendations
 
-The following are recommendations for running Handy on your own machine. If you don't meet the system requirements, the performance of the application may be degraded. We are working on improving the performance across all kinds of computers and hardware.
+The following are recommendations for running Murmel on your own machine. If you don't meet the system requirements, the performance of the application may be degraded. We are working on improving the performance across all kinds of computers and hardware.
 
 **For Whisper Models:**
 
@@ -244,80 +234,42 @@ The following are recommendations for running Handy on your own machine. If you 
 - **Performance**: ~5x real-time speed on mid-range hardware (tested on i5)
 - **Automatic language detection** - no manual language selection required
 
-## Roadmap & Active Development
+## Roadmap
 
-We're actively working on several features and improvements. Contributions and feedback are welcome!
+Die Roadmap steht im [Northstar-Dokument](Murmel_Northstar.md#8-roadmap). Kurzfassung:
 
-### In Progress
+- **Jetzt:** Rebranding abgeschlossen, Windows-Pfad stabilisieren
+- **Als Nächstes:** Text-Nachbearbeitung per lokalem LLM (formatieren, aufräumen),
+  lokale Nutzungsstatistiken, schlankeres UI
+- **Danach:** Ubuntu 24.04 inkl. sauberer Wayland-Anbindung über D-Bus
+- **Langfristig:** Android-Tastatur als eigenständiger Client
 
-**Debug Logging:**
+## Updater-Signaturen (offener Punkt)
 
-- Adding debug logging to a file to help diagnose issues
-
-**macOS Keyboard Improvements:**
-
-- Support for Globe key as transcription trigger
-- A rewrite of global shortcut handling for MacOS, and potentially other OS's too.
-
-**Opt-in Analytics:**
-
-- Collect anonymous usage data to help improve Handy
-- Privacy-first approach with clear opt-in
-
-**Settings Refactoring:**
-
-- Cleanup and refactor settings system which is becoming bloated and messy
-- Implement better abstractions for settings management
-
-**Tauri Commands Cleanup:**
-
-- Abstract and organize Tauri command patterns
-- Investigate tauri-specta for improved type safety and organization
-
-## Verify Release Signatures
-
-Handy release artifacts are signed with Tauri's updater signature format. The public key is stored in [`src-tauri/tauri.conf.json`](src-tauri/tauri.conf.json) under `plugins.updater.pubkey`.
-
-To verify a release manually, set `ARTIFACT` to the filename you downloaded, save the `pubkey` value from `src-tauri/tauri.conf.json` to `handy.pub.b64`, then decode the public key and matching `.sig` file from base64 and verify the artifact with `minisign`:
-
-```bash
-# Replace with the file you downloaded
-ARTIFACT="Handy_0.8.1_amd64.AppImage"
-
-python3 - "$ARTIFACT" <<'PY'
-import base64, pathlib, sys
-
-artifact = sys.argv[1]
-
-pub = pathlib.Path("handy.pub.b64").read_text().strip()
-pathlib.Path("handy.pub").write_bytes(base64.b64decode(pub))
-
-sig = pathlib.Path(f"{artifact}.sig").read_text().strip()
-pathlib.Path(f"{artifact}.minisig").write_bytes(base64.b64decode(sig))
-PY
-
-minisign -Vm "$ARTIFACT" \
-  -p handy.pub \
-  -x "$ARTIFACT.minisig"
-```
-
-On success, `minisign` prints:
-
-```text
-Signature and comment signature verified
-```
-
-Do not use `gpg` for these `.sig` files.
+> **Achtung:** `plugins.updater.pubkey` in [`src-tauri/tauri.conf.json`](src-tauri/tauri.conf.json)
+> ist noch der öffentliche Schlüssel des Upstream-Projekts. Der zugehörige private
+> Schlüssel liegt nicht in diesem Fork, es können also keine signierten Updates
+> ausgeliefert werden.
+>
+> Vor dem ersten eigenen Release ein eigenes Schlüsselpaar erzeugen und den
+> `pubkey` ersetzen:
+>
+> ```bash
+> bun run tauri signer generate -w ~/.tauri/murmel.key
+> ```
+>
+> Den privaten Schlüssel niemals committen — er gehört als
+> `TAURI_SIGNING_PRIVATE_KEY` in die GitHub-Secrets.
 
 ## Troubleshooting
 
 ### Manual Model Installation (For Proxy Users or Network Restrictions)
 
-If you're behind a proxy, firewall, or in a restricted network environment where Handy cannot download models automatically, you can manually download and install them. The URLs are publicly accessible from any browser.
+If you're behind a proxy, firewall, or in a restricted network environment where Murmel cannot download models automatically, you can manually download and install them. The URLs are publicly accessible from any browser.
 
 #### Step 1: Find Your App Data Directory
 
-1. Open Handy settings
+1. Open Murmel settings
 2. Navigate to the **About** section
 3. Copy the "App Data Directory" path shown there, or use the shortcuts:
    - **macOS**: `Cmd+Shift+D` to open debug menu
@@ -325,9 +277,9 @@ If you're behind a proxy, firewall, or in a restricted network environment where
 
 The typical paths are:
 
-- **macOS**: `~/Library/Application Support/com.pais.handy/`
-- **Windows**: `C:\Users\{username}\AppData\Roaming\com.pais.handy\`
-- **Linux**: `~/.config/com.pais.handy/`
+- **macOS**: `~/Library/Application Support/com.pais.murmel/`
+- **Windows**: `C:\Users\{username}\AppData\Roaming\com.pais.murmel\`
+- **Linux**: `~/.config/com.pais.murmel/`
 
 #### Step 2: Create Models Directory
 
@@ -335,10 +287,10 @@ Inside your app data directory, create a `models` folder if it doesn't already e
 
 ```bash
 # macOS/Linux
-mkdir -p ~/Library/Application\ Support/com.pais.handy/models
+mkdir -p ~/Library/Application\ Support/com.pais.murmel/models
 
 # Windows (PowerShell)
-New-Item -ItemType Directory -Force -Path "$env:APPDATA\com.pais.handy\models"
+New-Item -ItemType Directory -Force -Path "$env:APPDATA\com.pais.murmel\models"
 ```
 
 #### Step 3: Download Model Files
@@ -377,7 +329,7 @@ Simply place the `.bin` file directly into the `models` directory:
 
 **For GGUF Models (.gguf files):**
 
-Place the `.gguf` file directly into the `models` directory, exactly like the Whisper `.bin` files above. Handy also picks up models already present in the shared Hugging Face cache (`~/.cache/huggingface/hub`), so a copy downloaded by another tool works without being moved.
+Place the `.gguf` file directly into the `models` directory, exactly like the Whisper `.bin` files above. Murmel also picks up models already present in the shared Hugging Face cache (`~/.cache/huggingface/hub`), so a copy downloaded by another tool works without being moved.
 
 **For Parakeet Models (.tar.gz archives):**
 
@@ -403,24 +355,24 @@ Final structure should look like:
 
 - For Parakeet models, the extracted directory name **must** match exactly as shown above
 - Do not rename the `.bin` or `.gguf` files—use the exact filenames from the download URLs
-- After placing the files, restart Handy to detect the new models
+- After placing the files, restart Murmel to detect the new models
 
 #### Step 5: Verify Installation
 
-1. Restart Handy
+1. Restart Murmel
 2. Open Settings → Models
 3. Your manually installed models should now appear as "Downloaded"
 4. Select the model you want to use and test transcription
 
 ### Custom Whisper Models
 
-Handy can auto-discover custom Whisper GGML models placed in the `models` directory. This is useful for users who want to use fine-tuned or community models not included in the default model list.
+Murmel can auto-discover custom Whisper GGML models placed in the `models` directory. This is useful for users who want to use fine-tuned or community models not included in the default model list.
 
 **How to use:**
 
 1. Obtain a Whisper model in GGML `.bin` format (e.g., from [Hugging Face](https://huggingface.co/models?search=whisper%20ggml))
 2. Place the `.bin` file in your `models` directory (see paths above)
-3. Restart Handy to discover the new model
+3. Restart Murmel to discover the new model
 4. The model will appear in the "Custom Models" section of the Models settings page
 
 **Important:**
@@ -431,11 +383,11 @@ Handy can auto-discover custom Whisper GGML models placed in the `models` direct
 
 ### Linux Startup Crashes or Instability
 
-If Handy fails to start reliably on Linux — for example, it crashes shortly after launch, never shows its window, or reports a Wayland protocol error — try the steps below in order.
+If Murmel fails to start reliably on Linux — for example, it crashes shortly after launch, never shows its window, or reports a Wayland protocol error — try the steps below in order.
 
 **1. Install (or reinstall) `gtk-layer-shell`**
 
-Handy uses `gtk-layer-shell` for its recording overlay and links against it at runtime. A missing or broken installation is the most common cause of startup failures and can manifest as a crash or a hang well before any window is shown. Make sure the runtime package is installed for your distro:
+Murmel uses `gtk-layer-shell` for its recording overlay and links against it at runtime. A missing or broken installation is the most common cause of startup failures and can manifest as a crash or a hang well before any window is shown. Make sure the runtime package is installed for your distro:
 
 | Distro        | Package to install    | Example command                        |
 | ------------- | --------------------- | -------------------------------------- |
@@ -445,12 +397,12 @@ Handy uses `gtk-layer-shell` for its recording overlay and links against it at r
 
 If it is already installed and you still see startup problems, try reinstalling it (e.g. `sudo pacman -S gtk-layer-shell` again) in case the library files were corrupted by a partial upgrade.
 
-**2. Disable the GTK layer shell overlay (`HANDY_NO_GTK_LAYER_SHELL`)**
+**2. Disable the GTK layer shell overlay (`MURMEL_NO_GTK_LAYER_SHELL`)**
 
 If installing the library does not help, you can skip `gtk-layer-shell` initialization entirely as a workaround. On some compositors (notably KDE Plasma under Wayland) it has been reported to interact poorly with the recording overlay. With this variable set, the overlay falls back to a regular always-on-top window:
 
 ```bash
-HANDY_NO_GTK_LAYER_SHELL=1 handy
+MURMEL_NO_GTK_LAYER_SHELL=1 murmel
 ```
 
 **3. Disable WebKit DMA-BUF renderer (`WEBKIT_DISABLE_DMABUF_RENDERER`)**
@@ -458,68 +410,56 @@ HANDY_NO_GTK_LAYER_SHELL=1 handy
 On some GPU/driver combinations the WebKitGTK DMA-BUF renderer can cause the window to fail to render or to crash. Try:
 
 ```bash
-WEBKIT_DISABLE_DMABUF_RENDERER=1 handy
+WEBKIT_DISABLE_DMABUF_RENDERER=1 murmel
 ```
 
 **Making a workaround permanent**
 
-Once you've found a flag that helps, export it from your shell profile (`~/.bashrc`, `~/.zshenv`, …) or from the desktop autostart entry that launches Handy. If you launch Handy from a `.desktop` file, you can prefix the `Exec=` line, e.g.:
+Once you've found a flag that helps, export it from your shell profile (`~/.bashrc`, `~/.zshenv`, …) or from the desktop autostart entry that launches Murmel. If you launch Murmel from a `.desktop` file, you can prefix the `Exec=` line, e.g.:
 
 ```ini
-Exec=env HANDY_NO_GTK_LAYER_SHELL=1 handy
+Exec=env MURMEL_NO_GTK_LAYER_SHELL=1 murmel
 ```
 
-If a workaround helps you, please [open an issue](https://github.com/cjpais/Handy/issues) describing your distro, desktop environment, and session type — that information helps us narrow down the underlying bug.
+If a workaround helps you, please [open an issue](https://github.com/Suppenterrine/murmel/issues) describing your distro, desktop environment, and session type — that information helps us narrow down the underlying bug.
 
-### Handy Starts or Stops Recording on Its Own (Linux)
+### Murmel Starts or Stops Recording on Its Own (Linux)
 
-Handy 0.9.4 and earlier listened for `SIGUSR1` as a remote-control trigger. WebKitGTK — the webview engine embedded in Handy on Linux — uses that same signal internally to coordinate JavaScript garbage collection, so GC cycles were misread as hotkey presses: recordings started on their own, or real dictations were cut off mid-sentence (typically ~2 minutes in). See [#1660](https://github.com/cjpais/Handy/issues/1660).
+Murmel 0.9.4 and earlier listened for `SIGUSR1` as a remote-control trigger. WebKitGTK — the webview engine embedded in Murmel on Linux — uses that same signal internally to coordinate JavaScript garbage collection, so GC cycles were misread as hotkey presses: recordings started on their own, or real dictations were cut off mid-sentence (typically ~2 minutes in). See [#1660](https://github.com/cjpais/Handy/issues/1660).
 
-Update to a newer release, and replace any `pkill -USR1 -n handy` keybindings with `handy --toggle-post-process`.
+Update to a newer release, and replace any `pkill -USR1 -n murmel` keybindings with `murmel --toggle-post-process`.
 
-### How to Contribute
+### Mitmachen
 
-1. **Check existing issues** at [github.com/cjpais/Handy/issues](https://github.com/cjpais/Handy/issues)
-2. **Fork the repository** and create a feature branch
-3. **Test thoroughly** on your target platform
-4. **Submit a pull request** with clear description of changes
-5. **Join the discussion** - reach out at [contact@handy.computer](mailto:contact@handy.computer)
+Murmel ist in erster Linie ein persönliches Projekt und folgt dem
+[Northstar](Murmel_Northstar.md). Issues und PRs sind willkommen, werden aber
+daran gemessen — nicht jedes sinnvolle Feature passt zu Murmel.
 
-The goal is to create both a useful tool and a foundation for others to build upon—a well-patterned, simple codebase that serves the community.
+## Verwandte Projekte
 
-## Sponsors
+- **[Handy](https://github.com/cjpais/Handy)** — das Upstream-Projekt, auf dem Murmel aufbaut
+- **[handy.computer](https://handy.computer)** — Website des Upstream-Projekts;
+  hostet auch die Modelle, die Murmel herunterlädt
 
-<div align="center">
-  We're grateful for the support of our sponsors who help make Handy possible:
-  <br><br>
-  <a href="https://wordcab.com">
-    <img src="sponsor-images/wordcab.png" alt="Wordcab" width="120" height="120">
-  </a>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/epicenter-so/epicenter">
-    <img src="sponsor-images/epicenter.png" alt="Epicenter" width="120" height="120">
-  </a>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://boltai.com?utm_source=handy">
-    <img src="sponsor-images/boltai.jpg" alt="Bolt AI" width="120" height="120">
-  </a>
-</div>
+## Lizenz
 
-## Related Projects
+MIT License — siehe [LICENSE](LICENSE).
 
-- **[Handy CLI](https://github.com/cjpais/handy-cli)** - The original Python command-line version
-- **[handy.computer](https://handy.computer)** - Project website with demos and documentation
+Murmel ist ein Fork von [Handy](https://github.com/cjpais/Handy),
+Copyright © 2025 CJ Pais, ebenfalls MIT-lizenziert. Der ursprüngliche
+Copyright-Vermerk bleibt in [LICENSE](LICENSE) erhalten.
 
-## License
+**Markenrechte:** Upstream stellt den Code unter MIT, behält sich aber Name, Logo,
+Icon und Markenassets von Handy vor. Murmel verwendet daher durchgehend eigenes
+Branding — eigener Name, eigene Wortmarke, eigenes Icon-Set — und steht in keiner
+Verbindung zu Handy oder CJ Pais und wird von diesen weder unterstützt noch
+befürwortet.
 
-MIT License - see [LICENSE](LICENSE) file for details.
+## Danksagungen
 
-Handy is open-source software, but the Handy name, logo, icon, and brand assets are not open-source. Unofficial forks, rewrites, and redistributions must use their own branding and must not imply endorsement or affiliation.
-
-## Acknowledgments
-
-- **Whisper** by OpenAI for the speech recognition model
-- **ggml and transcribe.cpp** for amazing cross-platform speech-to-text inference/acceleration
-- **Silero** for great lightweight VAD
-- **Tauri** team for the excellent Rust-based app framework
-- **Community contributors** helping make Handy better
+- **[Handy](https://github.com/cjpais/Handy)** von CJ Pais — die Codebasis, die
+  Murmel überhaupt erst möglich macht
+- **Whisper** von OpenAI für das Spracherkennungsmodell
+- **ggml und transcribe.cpp** für plattformübergreifende STT-Inferenz
+- **Silero** für die leichtgewichtige VAD
+- **Tauri**-Team für das Rust-basierte App-Framework

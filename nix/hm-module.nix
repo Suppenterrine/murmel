@@ -1,8 +1,8 @@
-# Home-manager module for Handy speech-to-text
+# Home-manager module for Murmel speech-to-text
 #
 # Provides a systemd user service for autostart.
-# Usage: imports = [ handy.homeManagerModules.default ];
-#        services.handy.enable = true;
+# Usage: imports = [ murmel.homeManagerModules.default ];
+#        services.murmel.enable = true;
 {
   config,
   lib,
@@ -10,28 +10,28 @@
   ...
 }:
 let
-  cfg = config.services.handy;
+  cfg = config.services.murmel;
 in
 {
-  options.services.handy = {
-    enable = lib.mkEnableOption "Handy speech-to-text user service";
+  options.services.murmel = {
+    enable = lib.mkEnableOption "Murmel speech-to-text user service";
 
     package = lib.mkOption {
       type = lib.types.package;
-      defaultText = lib.literalExpression "handy.packages.\${system}.handy";
-      description = "The Handy package to use.";
+      defaultText = lib.literalExpression "murmel.packages.\${system}.murmel";
+      description = "The Murmel package to use.";
     };
   };
 
   config = lib.mkIf cfg.enable {
-    systemd.user.services.handy = {
+    systemd.user.services.murmel = {
       Unit = {
-        Description = "Handy speech-to-text";
+        Description = "Murmel speech-to-text";
         After = [ "graphical-session.target" ];
         PartOf = [ "graphical-session.target" ];
       };
       Service = {
-        ExecStart = "${cfg.package}/bin/handy";
+        ExecStart = "${cfg.package}/bin/murmel";
         Restart = "on-failure";
         RestartSec = 5;
       };
