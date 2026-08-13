@@ -1,6 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { platform } from "@tauri-apps/plugin-os";
+// Wortmarke (MurmelTextLogo). Über fontsource lokal gebündelt statt vom
+// Google-CDN geladen — Murmel darf im Betrieb keine Netzwerkanfragen stellen.
+import "@fontsource-variable/fraunces";
 import App from "./App";
 import { installCompatShims } from "./lib/compat";
 import {

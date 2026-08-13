@@ -1,31 +1,104 @@
-/* Murmel Colors */
+/* Murmel Colors — monochrom.
+ *
+ * Grundgedanke: zwei Grundfarben, alles andere daraus gemischt. Tinte auf
+ * Papier. Kein Buntton als Dekoration — Farbe tritt nur dort auf, wo sie
+ * etwas bedeutet (Warnung/Fehler, siehe unten).
+ *
+ * Die beiden Grundtöne stammen aus dem Schwesterprojekt `gene`
+ * (src/styles/theme.css) und werden bewusst identisch gehalten, damit beide
+ * Projekte dieselbe Handschrift haben.
+ */
 
 :root {
+  /* ── Die zwei Grundfarben — nur diese sind gesetzt, nicht abgeleitet ───── */
+  --ink: #141410; /* Tintendunkel */
+  --paper: #f0ede6; /* Warm-Weiß */
+
+  /* Hellstes Pergament — nur für Flächen, die sich vom Papier abheben sollen,
+     ohne kälter zu werden (die Murmelfläche im Hellmodus). */
+  --paper-hi: #faf8f3;
+
+  /* Helle Tinte auf dunklem Grund. Kein reines Papierweiß: das würde auf der
+     dunklen Fläche grell wirken statt ruhig. */
+  --ink-on-dark: #d8d2c4;
+
+  /* Dunkler Grund. Eine Spur heller als --ink, damit die Murmel-Kontur und
+     dunkle Striche darauf überhaupt lesbar bleiben. */
+  --ink-surface: #1a1915;
+
+  /* ── Abgeleitete Neutraltöne — KEINE neuen Grundtöne ──────────────────── */
+  --ink-dim: color-mix(in srgb, var(--ink) 62%, var(--paper));
+  --ink-mid: color-mix(in srgb, var(--ink) 42%, var(--paper));
+  --ink-soft: color-mix(in srgb, var(--ink) 85%, var(--paper));
+
   /* Palette source of truth. Each themed color is defined once as a
      light/dark pair; the active tokens below and the `data-theme` overrides
      in App.css reference these, so a hex value lives in exactly one place. */
-  --light-color-text: #0f0f0f;
-  --light-color-background: #fbfbfb;
-  --light-color-logo-primary: #faa2ca;
-  --light-color-logo-stroke: #382731;
+  --light-color-text: var(--ink);
+  --light-color-background: var(--paper);
+  --dark-color-text: var(--ink-on-dark);
+  --dark-color-background: var(--ink-surface);
 
-  --dark-color-text: #fbfbfb;
-  --dark-color-background: #2c2b29;
-  --dark-color-logo-primary: #f28cbb;
-  --dark-color-logo-stroke: #fad1ed;
+  /* WICHTIG — zwei getrennte Rollen, die früher eine waren:
+   *
+   *   --color-logo-primary  = AKZENT der Oberfläche (aktive Zustände, Buttons,
+   *                           Hervorhebungen). Hieß so, weil es früher das
+   *                           Logo-Pink war; der Name bleibt, damit die vielen
+   *                           `bg-logo-primary`-Stellen weiter funktionieren.
+   *   --color-logo-fill     = die Fläche der Murmel im Bildzeichen.
+   *
+   * Wer beides vermischt, bekommt hellen Text auf heller Fläche. */
+  --light-color-logo-primary: var(--ink);
+  --dark-color-logo-primary: var(--ink-on-dark);
 
-  /* Semantic status colors. First used by SecureInputWarning; intended to
-     replace the ad-hoc yellow-500/red-500 usages (e.g. ui/Alert.tsx) over
-     time so status styling is themeable from one place. */
-  --light-color-warning: #d97706;
-  --light-color-error: #dc2626;
-  --dark-color-warning: #fbbf24;
-  --dark-color-error: #f87171;
+  /* Gegenfarbe für Text/Icons AUF einer --color-logo-primary-Fläche. */
+  --light-color-on-logo-primary: var(--paper);
+  --dark-color-on-logo-primary: var(--ink);
+
+  /* Das Bildzeichen ist in beiden Themes dasselbe Objekt: eine helle Glaskugel
+     mit dunklem Band. Deshalb sind seine Töne bewusst NICHT theme-abhängig —
+     eine Murmel wechselt nicht die Farbe, nur weil die Oberfläche es tut.
+     `--color-logo-fill` ist die Lichtseite, `--color-logo-shade` die
+     abgewandte Seite; dazwischen liegt der Verlauf, der das Volumen macht. */
+  --light-color-logo-fill: var(--paper-hi);
+  --dark-color-logo-fill: var(--paper-hi);
+  --light-color-logo-stroke: var(--ink);
+  --dark-color-logo-stroke: var(--ink);
+
+  /* Schattenseite der Kugel — warmes Grau aus derselben Familie, kein Neutral. */
+  --color-logo-shade: #b9b1a0;
+  --color-logo-mid: #ddd7c8;
+
+  /* Dezente Fläche für ausgewählte Einträge (Sidebar). Hebt sich allein durch
+     Helligkeit ab, damit der normale Textton darauf lesbar bleibt. */
+  --light-color-surface-active: color-mix(
+    in srgb,
+    var(--ink) 12%,
+    var(--paper)
+  );
+  --dark-color-surface-active: color-mix(
+    in srgb,
+    var(--ink-on-dark) 14%,
+    var(--ink-surface)
+  );
+
+  /* Semantic status colors. Bewusst NICHT monochrom: eine Warnung, die aussieht
+     wie normaler Text, ist keine Warnung. Beide Töne sind aber in dieselbe
+     warme Familie gezogen (gedecktes Ocker / Rost statt Signalgelb und -rot),
+     damit sie neben der Graustufen-Palette nicht wie Fremdkörper wirken. */
+  --light-color-warning: #a8701f;
+  --light-color-error: #b3452f;
+  --dark-color-warning: #d9a441;
+  --dark-color-error: #d4705a;
+
+  /* Aktive UI-Fläche (Slider-Füllung, Overlay-Verlauf). Früher das Logo-Pink;
+     jetzt schlicht die Tinte — im Dunkelmodus entsprechend die helle Tinte. */
+  --light-color-background-ui: var(--ink);
+  --dark-color-background-ui: var(--ink-on-dark);
 
   /* Tokens that do not change between light and dark */
-  --color-background-ui: #da5893;
-  --color-text-stroke: #f6f6f6;
-  --color-mid-gray: #808080;
+  --color-text-stroke: var(--paper);
+  --color-mid-gray: var(--ink-mid);
 
   /* Active palette — defaults to light, follows the OS via the media query
      below, or is forced by `data-theme` (see the overrides below). */
@@ -33,8 +106,12 @@
   --color-background: var(--light-color-background);
   --color-logo-primary: var(--light-color-logo-primary);
   --color-logo-stroke: var(--light-color-logo-stroke);
+  --color-logo-fill: var(--light-color-logo-fill);
+  --color-on-logo-primary: var(--light-color-on-logo-primary);
+  --color-surface-active: var(--light-color-surface-active);
   --color-warning: var(--light-color-warning);
   --color-error: var(--light-color-error);
+  --color-background-ui: var(--light-color-background-ui);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -43,8 +120,17 @@
     --color-background: var(--dark-color-background);
     --color-logo-primary: var(--dark-color-logo-primary);
     --color-logo-stroke: var(--dark-color-logo-stroke);
+    --color-logo-fill: var(--dark-color-logo-fill);
+    --color-on-logo-primary: var(--dark-color-on-logo-primary);
+    --color-surface-active: var(--dark-color-surface-active);
     --color-warning: var(--dark-color-warning);
     --color-error: var(--dark-color-error);
+    --color-background-ui: var(--dark-color-background-ui);
+    /* Neutraltöne im Dunkelmodus aus der hellen Tinte mischen, sonst fallen
+       sie gegen den dunklen Grund in sich zusammen. */
+    --ink-dim: color-mix(in srgb, var(--ink-on-dark) 72%, var(--ink-surface));
+    --ink-mid: color-mix(in srgb, var(--ink-on-dark) 48%, var(--ink-surface));
+    --ink-soft: color-mix(in srgb, var(--ink-on-dark) 88%, var(--ink-surface));
   }
 }
 
@@ -63,8 +149,15 @@
   --color-background: var(--light-color-background);
   --color-logo-primary: var(--light-color-logo-primary);
   --color-logo-stroke: var(--light-color-logo-stroke);
+  --color-logo-fill: var(--light-color-logo-fill);
+  --color-on-logo-primary: var(--light-color-on-logo-primary);
+  --color-surface-active: var(--light-color-surface-active);
   --color-warning: var(--light-color-warning);
   --color-error: var(--light-color-error);
+  --color-background-ui: var(--light-color-background-ui);
+  --ink-dim: color-mix(in srgb, var(--ink) 62%, var(--paper));
+  --ink-mid: color-mix(in srgb, var(--ink) 42%, var(--paper));
+  --ink-soft: color-mix(in srgb, var(--ink) 85%, var(--paper));
 }
 
 :root[data-theme="dark"] {
@@ -72,6 +165,13 @@
   --color-background: var(--dark-color-background);
   --color-logo-primary: var(--dark-color-logo-primary);
   --color-logo-stroke: var(--dark-color-logo-stroke);
+  --color-logo-fill: var(--dark-color-logo-fill);
+  --color-on-logo-primary: var(--dark-color-on-logo-primary);
+  --color-surface-active: var(--dark-color-surface-active);
   --color-warning: var(--dark-color-warning);
   --color-error: var(--dark-color-error);
+  --color-background-ui: var(--dark-color-background-ui);
+  --ink-dim: color-mix(in srgb, var(--ink-on-dark) 72%, var(--ink-surface));
+  --ink-mid: color-mix(in srgb, var(--ink-on-dark) 48%, var(--ink-surface));
+  --ink-soft: color-mix(in srgb, var(--ink-on-dark) 88%, var(--ink-surface));
 }

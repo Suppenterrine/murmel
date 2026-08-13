@@ -16,7 +16,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = React.memo(
     const { t } = useTranslation();
     const { settings, updateSetting } = useSettings();
 
-    const currentTheme: Theme = settings?.theme ?? "system";
+    const currentTheme: Theme = settings?.theme ?? "light";
 
     const themeOptions = THEME_OPTIONS.map((value) => ({
       value,

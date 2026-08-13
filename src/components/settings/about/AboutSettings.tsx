@@ -10,6 +10,9 @@ import { AppLanguageSelector } from "../AppLanguageSelector";
 import { ShowWhatsNewOnUpdate } from "../ShowWhatsNewOnUpdate";
 import { ThemeSelector } from "../ThemeSelector";
 import { LogDirectory } from "../debug";
+import MurmelHand from "../../icons/MurmelHand";
+import MurmelTextLogo from "../../icons/MurmelTextLogo";
+import Copyright from "../../Copyright";
 
 export const AboutSettings: React.FC = () => {
   const { t } = useTranslation();
@@ -29,16 +32,15 @@ export const AboutSettings: React.FC = () => {
     fetchVersion();
   }, []);
 
-  const handleDonateClick = async () => {
-    try {
-      await openUrl("https://handy.computer/donate");
-    } catch (error) {
-      console.error("Failed to open donate link:", error);
-    }
-  };
-
   return (
     <div className="max-w-3xl w-full mx-auto space-y-6">
+      {/* Markenkopf: die Bildmarke einmal in Ruhe und Größe zeigen. */}
+      <div className="flex flex-col items-center gap-4 py-6">
+        <MurmelHand width={112} height={112} />
+        <MurmelTextLogo width={160} />
+        <Copyright />
+      </div>
+
       <SettingsGroup title={t("settings.about.title")}>
         <AppLanguageSelector descriptionMode="tooltip" grouped={true} />
         <ThemeSelector descriptionMode="tooltip" grouped={true} />
@@ -52,16 +54,6 @@ export const AboutSettings: React.FC = () => {
         </SettingContainer>
 
         <ShowWhatsNewOnUpdate descriptionMode="tooltip" grouped={true} />
-
-        <SettingContainer
-          title={t("settings.about.supportDevelopment.title")}
-          description={t("settings.about.supportDevelopment.description")}
-          grouped={true}
-        >
-          <Button variant="primary" size="md" onClick={handleDonateClick}>
-            {t("settings.about.supportDevelopment.button")}
-          </Button>
-        </SettingContainer>
 
         <SettingContainer
           title={t("settings.about.sourceCode.title")}

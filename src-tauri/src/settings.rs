@@ -587,7 +587,10 @@ fn default_sound_theme() -> SoundTheme {
 }
 
 fn default_theme() -> Theme {
-    Theme::System
+    // Murmel ist auf das warme Papier hin entworfen (siehe styles/theme.css);
+    // deshalb hell als Ausgangspunkt statt „folge dem System". Umschaltbar
+    // bleibt es über die Einstellungen und den Schalter in der Fußzeile.
+    Theme::Light
 }
 
 fn default_post_process_enabled() -> bool {

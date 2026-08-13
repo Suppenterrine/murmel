@@ -13,6 +13,7 @@ import AccessibilityPermissions from "./components/AccessibilityPermissions";
 import SecureInputWarning from "./components/SecureInputWarning";
 import Footer from "./components/footer";
 import Onboarding, { AccessibilityOnboarding } from "./components/onboarding";
+import Splash from "./components/Splash";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Sidebar, SidebarSection, SECTIONS_CONFIG } from "./components/Sidebar";
 import { WhatsNewGate } from "./components/whats-new";
@@ -273,16 +274,18 @@ function App() {
     />
   );
 
-  // Still checking onboarding status
-  if (onboardingStep === null) {
-    return null;
-  }
-
   // Select the content for the current step. The Toaster is rendered once, in a
   // stable wrapper around this node, so crossing between onboarding steps and
   // the main app never remounts it (which would drop any in-flight toast).
-  let content: ReactNode;
-  if (onboardingStep === "accessibility") {
+  //
+  // `content` stays null while the onboarding status is still being checked —
+  // deliberately not an early return, so <Splash> below keeps its place in the
+  // tree and does not remount (which would restart its timer) once the check
+  // resolves. The splash covers that loading moment.
+  let content: ReactNode = null;
+  if (onboardingStep === null) {
+    content = null;
+  } else if (onboardingStep === "accessibility") {
     content = (
       <AccessibilityOnboarding onComplete={handleAccessibilityComplete} />
     );
@@ -322,6 +325,7 @@ function App() {
 
   return (
     <>
+      <Splash />
       {toaster}
       {content}
     </>

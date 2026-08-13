@@ -12,8 +12,12 @@ const Badge: React.FC<BadgeProps> = ({
   className = "",
 }) => {
   const variantClasses = {
-    primary: "bg-logo-primary",
-    success: "bg-green-500/20 text-green-400",
+    // `text-on-logo-primary` ist Pflicht, nicht Kosmetik: die Fläche ist im
+    // Hellmodus dunkel und im Dunkelmodus hell. Ohne eigene Textfarbe erbt der
+    // Text den normalen Textton — und der ist im Dunkelmodus genauso hell wie
+    // die Fläche, das Badge wird unlesbar.
+    primary: "bg-logo-primary text-on-logo-primary",
+    success: "bg-mid-gray/20 text-text/70",
     secondary: "bg-mid-gray/20 text-text/70",
   };
 
