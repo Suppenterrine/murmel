@@ -1,7 +1,12 @@
 /**
  * Language metadata for supported locales.
  *
- * To add a new language:
+ * Murmel ships German and English only. The fork inherited 24 languages, but a
+ * single maintainer cannot check a translation they do not speak — and every
+ * new string would otherwise cost 24 entries, 22 of them machine-made or filled
+ * with English. See Murmel_Northstar.md §4.2.
+ *
+ * To add a language:
  * 1. Create a new folder: src/i18n/locales/{code}/translation.json
  * 2. Add an entry here with the language code, English name, and native name
  * 3. Optionally add a priority (lower = higher in dropdown, no priority = alphabetical at end)
@@ -16,28 +21,6 @@ export const LANGUAGE_METADATA: Record<
     direction?: "ltr" | "rtl";
   }
 > = {
-  en: { name: "English", nativeName: "English", priority: 1 },
-  zh: { name: "Simplified Chinese", nativeName: "简体中文", priority: 2 },
-  "zh-TW": { name: "Traditional Chinese", nativeName: "繁體中文", priority: 3 },
-  es: { name: "Spanish", nativeName: "Español", priority: 4 },
-  fr: { name: "French", nativeName: "Français", priority: 5 },
-  de: { name: "German", nativeName: "Deutsch", priority: 6 },
-  ja: { name: "Japanese", nativeName: "日本語", priority: 7 },
-  ko: { name: "Korean", nativeName: "한국어", priority: 8 },
-  vi: { name: "Vietnamese", nativeName: "Tiếng Việt", priority: 9 },
-  pl: { name: "Polish", nativeName: "Polski", priority: 10 },
-  it: { name: "Italian", nativeName: "Italiano", priority: 11 },
-  ru: { name: "Russian", nativeName: "Русский", priority: 12 },
-  uk: { name: "Ukrainian", nativeName: "Українська", priority: 13 },
-  pt: { name: "Portuguese", nativeName: "Português", priority: 14 },
-  cs: { name: "Czech", nativeName: "Čeština", priority: 15 },
-  tr: { name: "Turkish", nativeName: "Türkçe", priority: 16 },
-  ar: { name: "Arabic", nativeName: "العربية", priority: 17, direction: "rtl" },
-  he: { name: "Hebrew", nativeName: "עברית", priority: 18, direction: "rtl" },
-  sv: { name: "Swedish", nativeName: "Svenska", priority: 19 },
-  bg: { name: "Bulgarian", nativeName: "Български", priority: 20 },
-  nl: { name: "Dutch", nativeName: "Nederlands", priority: 21 },
-  ne: { name: "Nepali", nativeName: "नेपाली", priority: 22 },
-  hi: { name: "Hindi", nativeName: "हिन्दी", priority: 23 },
-  da: { name: "Danish", nativeName: "Dansk", priority: 24 },
+  de: { name: "German", nativeName: "Deutsch", priority: 1 },
+  en: { name: "English", nativeName: "English", priority: 2 },
 };

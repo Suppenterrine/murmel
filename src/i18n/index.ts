@@ -51,37 +51,26 @@ export const SUPPORTED_LANGUAGES = Object.keys(resources)
 
 export type SupportedLanguageCode = string;
 
-// Check if a language code is supported
+/**
+ * Resolve a system locale to a language Murmel ships.
+ *
+ * `de-AT` resolves to `de`, anything unknown returns null and leaves the caller
+ * on English. The upstream version additionally mapped Chinese script and
+ * region subtags to Simplified or Traditional; that went with those locales
+ * when Murmel cut back to German and English (Murmel_Northstar.md §4.2).
+ */
 export const getSupportedLanguage = (
   langCode: string | null | undefined,
 ): SupportedLanguageCode | null => {
   if (!langCode) return null;
 
   const normalized = langCode.toLowerCase().replace(/_/g, "-");
-  const subtags = normalized.split("-");
-  const language = subtags[0];
-  const isHant = subtags.includes("hant");
-  const isHans = subtags.includes("hans");
-  const isTraditionalRegion = ["tw", "hk", "mo"].some((region) =>
-    subtags.includes(region),
-  );
+  const language = normalized.split("-")[0];
 
-  // Try exact match first
-  let supported = SUPPORTED_LANGUAGES.find(
-    (lang) => lang.code.toLowerCase() === normalized,
-  );
-  if (!supported) {
-    let fallback = language;
-    if (language === "zh" && (isHant || (!isHans && isTraditionalRegion))) {
-      fallback = "zh-tw";
-    } else if (language === "yue") {
-      // Cantonese uses Traditional Chinese unless explicitly tagged as Hans.
-      fallback = isHans ? "zh" : "zh-tw";
-    }
-    supported = SUPPORTED_LANGUAGES.find(
-      (lang) => lang.code.toLowerCase() === fallback,
-    );
-  }
+  const supported =
+    SUPPORTED_LANGUAGES.find((lang) => lang.code.toLowerCase() === normalized) ??
+    SUPPORTED_LANGUAGES.find((lang) => lang.code.toLowerCase() === language);
+
   return supported ? supported.code : null;
 };
 

@@ -155,24 +155,31 @@ The app enforces single instance behavior — launching when already running bri
 
 All user-facing strings must use i18next translations. ESLint enforces this (no hardcoded strings in JSX).
 
+**Murmel ships German and English only.** The fork arrived with 24 languages;
+they were removed in favour of the two the maintainer can actually proofread
+(Murmel_Northstar.md §4.2). `check:translations` runs in CI and compares every
+locale against the English reference, so **both** files must be updated for
+every new string — an English-only key fails the build.
+
 **Adding new text:**
 
-1. Add key to `src/i18n/locales/en/translation.json`
-2. Use in component: `const { t } = useTranslation(); t('key.path')`
+1. Add key to `src/i18n/locales/en/translation.json` (the reference)
+2. Add the same key to `src/i18n/locales/de/translation.json`
+3. Use in component: `const { t } = useTranslation(); t('key.path')`
 
 **File structure:**
 
 ```
 src/i18n/
-├── index.ts           # i18n setup
+├── index.ts           # i18n setup, discovers locales via glob
 ├── languages.ts       # Language metadata
 └── locales/
-    ├── en/translation.json  # English (source)
-    ├── de/, es/, fr/, ja/, ru/, zh/, ...
-    └── ...
+    ├── en/translation.json  # English (reference for the consistency check)
+    └── de/translation.json  # German
 ```
 
-For translation contribution guidelines, see [CONTRIBUTING_TRANSLATIONS.md](CONTRIBUTING_TRANSLATIONS.md).
+`src-tauri/build.rs` generates the tray menu translations from these same files,
+so adding or removing a locale directory needs no further wiring.
 
 ## Code Style
 
