@@ -174,6 +174,14 @@ easy to miss, and both fail _silently_ — the app simply never sees an update:
    "latest". Until the draft is published, every installation keeps reporting
    "up to date".
 
+3. **Write the release note before building.** The "What's New" window reads
+   `src/content/release-notes/<version>.md`, bundled into the frontend at build
+   time — GitHub's own release notes are never fetched. A missing file is not an
+   error: the update installs, and the window simply stays away. Worse, it
+   cannot be fixed afterwards, because only the _highest_ note newer than
+   `whats_new_last_seen_version` is shown — a skipped version is skipped for
+   good. 0.11.0 shipped without one.
+
 ### The signing key is what makes updates work at all
 
 `plugins.updater.pubkey` in `tauri.conf.json` is baked into every build. An
