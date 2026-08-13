@@ -45,3 +45,10 @@ result
 
 # Python bytecode (scripts/)
 __pycache__/
+
+# Updater-Signaturschlüssel. Der private Schlüssel gehört NIE ins Repo — wer ihn
+# hat, kann Updates signieren, die jede Murmel-Installation als echt akzeptiert.
+# Er liegt unter ~/.tauri/ und in den GitHub-Secrets; nur der öffentliche
+# Schlüssel steht (in tauri.conf.json) im Repo.
+*.key
+*.key.pub

@@ -77,7 +77,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJBQjcyMDk1MjA2NjAxRjkKUldUNUFXWWdsU0MzdXRRZi8zYzhqV2FaNUVDbDd2Rk5VM1IvWWowVXdmRFNKQ1BrMXF5RFFsLy8K",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhFNDFDQ0ZENTNBMEM4QzEKUldUQnlLQlQvY3hCam1KYkx4QzVPM1RoSjRQSEZKSkd1dGo0K3dseml3YTZLM2ZueXpLL3NFZHYK",
       "endpoints": [
         "https://github.com/Suppenterrine/murmel/releases/latest/download/latest.json"
       ]
