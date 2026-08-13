@@ -395,10 +395,17 @@
         "appleIntelligence": {
           "unavailable": "Apple Intelligence is not available on this device. Requires an Apple Silicon Mac running macOS Tahoe (26.0) or later with Apple Intelligence enabled in System Settings."
         },
+        "endpoint": {
+          "remote": "This provider sends your dictated text to an external server. For everything to stay on this machine, choose a local provider such as Ollama.",
+          "checking": "Checking local service…",
+          "reachable_one": "Local service running, 1 model available.",
+          "reachable_other": "Local service running, {{count}} models available.",
+          "unreachable": "Local service not reachable. Refinement will be skipped and the raw transcript inserted. Is Ollama running?"
+        },
         "baseUrl": {
           "title": "Base URL",
-          "description": "API base URL for the selected provider. Only the custom provider can be edited.",
-          "placeholder": "https://api.openai.com/v1"
+          "description": "API base URL for the selected provider. Editable for local and custom providers.",
+          "placeholder": "http://localhost:11434/v1"
         },
         "apiKey": {
           "title": "API Key",

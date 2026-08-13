@@ -412,6 +412,13 @@
           "placeholderWithOptions": "Tìm kiếm hoặc chọn một mô hình",
           "placeholderNoOptions": "Nhập tên mô hình",
           "refreshModels": "Làm mới mô hình"
+        },
+        "endpoint": {
+          "remote": "This provider sends your dictated text to an external server. For everything to stay on this machine, choose a local provider such as Ollama.",
+          "checking": "Checking local service…",
+          "reachable_one": "Local service running, 1 model available.",
+          "reachable_other": "Local service running, {{count}} models available.",
+          "unreachable": "Local service not reachable. Refinement will be skipped and the raw transcript inserted. Is Ollama running?"
         }
       },
       "prompts": {

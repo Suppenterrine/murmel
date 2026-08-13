@@ -264,6 +264,14 @@ async fetchPostProcessModels(providerId: string) : Promise<Result<string[], stri
     else return { status: "error", error: e  as any };
 }
 },
+async checkPostProcessEndpoint(providerId: string) : Promise<Result<EndpointStatus, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("check_post_process_endpoint", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async addPostProcessPrompt(name: string, prompt: string) : Promise<Result<LLMPrompt, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("add_post_process_prompt", { name, prompt }) };
@@ -977,6 +985,25 @@ export type EngineType =
  * the file, so this one variant covers the whole transcribe-cpp family.
  */
 "TranscribeCpp" | "Parakeet" | "Moonshine" | "MoonshineStreaming" | "SenseVoice" | "GigaAM" | "Canary" | "Cohere"
+/**
+ * Where a refinement provider sends the dictated text, and — for local ones —
+ * whether it is actually running.
+ */
+export type EndpointStatus = {
+/**
+ * False means the dictated text leaves this machine. The UI has to say so
+ * (Murmel_Northstar.md §5.2).
+ */
+is_local: boolean;
+/**
+ * `None` for remote endpoints: Murmel does not call a cloud API just to
+ * draw a status dot, and a paid endpoint should not be poked on a whim.
+ */
+reachable: boolean | null; models: string[];
+/**
+ * Why the local endpoint could not be reached, for the UI to show.
+ */
+error: string | null }
 export type GpuDeviceOption = { id: number; name: string; total_vram_mb: number }
 export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string;
 /**

@@ -14,6 +14,7 @@ import { Button } from "../../ui/Button";
 import { ResetButton } from "../../ui/ResetButton";
 import { Input } from "../../ui/Input";
 
+import { EndpointStatusNotice } from "../PostProcessingSettingsApi/EndpointStatusNotice";
 import { ProviderSelect } from "../PostProcessingSettingsApi/ProviderSelect";
 import { BaseUrlField } from "../PostProcessingSettingsApi/BaseUrlField";
 import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
@@ -52,7 +53,15 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
         ) : null
       ) : (
         <>
-          {state.selectedProvider?.id === "custom" && (
+          <EndpointStatusNotice
+            providerId={state.selectedProviderId}
+            baseUrl={state.baseUrl}
+          />
+
+          {/* Keyed off the provider's own flag rather than a hardcoded id, so
+              Ollama's port stays editable too — it is configurable, and the
+              service may live on another machine. */}
+          {state.selectedProvider?.allow_base_url_edit && (
             <SettingContainer
               title={t("settings.postProcessing.api.baseUrl.title")}
               description={t("settings.postProcessing.api.baseUrl.description")}

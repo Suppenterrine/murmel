@@ -204,7 +204,14 @@ async fn post_process_transcription(
     // Ask these providers to skip reasoning/thinking — post-processing rarely
     // benefits from it and it adds seconds of latency. llm_client picks the
     // field the endpoint understands and retries without it if rejected.
-    let disable_reasoning = matches!(provider.id.as_str(), "custom" | "openrouter");
+    //
+    // Ollama matters most here: the small local models worth running (Qwen3 in
+    // particular) think by default, which both costs seconds and risks the
+    // chain of thought ending up in the pasted text.
+    let disable_reasoning = matches!(
+        provider.id.as_str(),
+        "custom" | "openrouter" | crate::settings::OLLAMA_PROVIDER_ID
+    );
 
     if provider.supports_structured_output {
         debug!("Using structured outputs for provider '{}'", provider.id);

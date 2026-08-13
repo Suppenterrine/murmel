@@ -1216,6 +1216,73 @@ pub async fn fetch_post_process_models(
     crate::llm_client::fetch_models(provider, api_key).await
 }
 
+/// Where a refinement provider sends the dictated text, and — for local ones —
+/// whether it is actually running.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, specta::Type)]
+pub struct EndpointStatus {
+    /// False means the dictated text leaves this machine. The UI has to say so
+    /// (Murmel_Northstar.md §5.2).
+    pub is_local: bool,
+    /// `None` for remote endpoints: Murmel does not call a cloud API just to
+    /// draw a status dot, and a paid endpoint should not be poked on a whim.
+    pub reachable: Option<bool>,
+    pub models: Vec<String>,
+    /// Why the local endpoint could not be reached, for the UI to show.
+    pub error: Option<String>,
+}
+
+/// Check a refinement provider before it is used in anger.
+///
+/// Without this, a stopped Ollama is invisible until a dictation quietly comes
+/// back unrefined — the failure looks like "the feature does nothing" rather
+/// than "the service is not running".
+#[tauri::command]
+#[specta::specta]
+pub async fn check_post_process_endpoint(
+    app: AppHandle,
+    provider_id: String,
+) -> Result<EndpointStatus, String> {
+    let settings = settings::get_settings(&app);
+
+    let provider = settings
+        .post_process_providers
+        .iter()
+        .find(|p| p.id == provider_id)
+        .ok_or_else(|| format!("Provider '{}' not found", provider_id))?;
+
+    if !settings::is_local_endpoint(&provider.base_url) {
+        return Ok(EndpointStatus {
+            is_local: false,
+            reachable: None,
+            models: Vec::new(),
+            error: None,
+        });
+    }
+
+    let api_key = settings
+        .post_process_api_keys
+        .get(&provider_id)
+        .cloned()
+        .unwrap_or_default();
+
+    Ok(
+        match crate::llm_client::fetch_models(provider, api_key).await {
+            Ok(models) => EndpointStatus {
+                is_local: true,
+                reachable: Some(true),
+                models,
+                error: None,
+            },
+            Err(error) => EndpointStatus {
+                is_local: true,
+                reachable: Some(false),
+                models: Vec::new(),
+                error: Some(error),
+            },
+        },
+    )
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn set_post_process_selected_prompt(app: AppHandle, id: String) -> Result<(), String> {
