@@ -671,6 +671,15 @@ async showMainWindowCommand() : Promise<Result<null, string>> {
 async cancelOperation() : Promise<void> {
     await TAURI_INVOKE("cancel_operation");
 },
+/**
+ * Take the error message off the screen before its time is up.
+ * 
+ * The overlay shows a countdown, and a countdown the user cannot cut short is
+ * decoration. Called from the overlay's own dismiss button.
+ */
+async dismissOverlayProblem() : Promise<void> {
+    await TAURI_INVOKE("dismiss_overlay_problem");
+},
 async isPortable() : Promise<boolean> {
     return await TAURI_INVOKE("is_portable");
 },
@@ -1005,9 +1014,9 @@ async getHistoryEntries(cursor: number | null, limit: number | null) : Promise<R
  * and mixing the two would mean a cursor that means different things depending
  * on whether a search term is present.
  */
-async searchHistoryEntries(query: string | null, onlySaved: boolean, limit: number | null) : Promise<Result<HistoryEntry[], string>> {
+async searchHistoryEntries(query: string | null, onlySaved: boolean, kind: EntryKind | null, limit: number | null) : Promise<Result<HistoryEntry[], string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("search_history_entries", { query, onlySaved, limit }) };
+    return { status: "ok", data: await TAURI_INVOKE("search_history_entries", { query, onlySaved, kind, limit }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };

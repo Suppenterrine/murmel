@@ -616,7 +616,14 @@
         "rewrite": "Rewritten"
       },
       "refinementRetry": "Refine again",
-      "refinementRetrying": "Running …"
+      "refinementRetrying": "Running …",
+      "filters": {
+        "all": "All",
+        "favorites": "Favourites",
+        "dictation": "Dictations",
+        "command": "Commands",
+        "rewrite": "Rewritten"
+      }
     },
     "debug": {
       "title": "Debug",
@@ -806,7 +813,8 @@
     "open": "Open",
     "copy": "Copy",
     "clear": "Clear",
-    "noOptionsFound": "No options found"
+    "noOptionsFound": "No options found",
+    "cancel": "Cancel"
   },
   "accessibility": {
     "permissionsDescription": "Murmel needs accessibility permissions to type transcribed text.",

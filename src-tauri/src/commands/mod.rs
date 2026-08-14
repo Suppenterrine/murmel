@@ -14,6 +14,16 @@ pub fn cancel_operation(app: AppHandle) {
     cancel_current_operation(&app);
 }
 
+/// Take the error message off the screen before its time is up.
+///
+/// The overlay shows a countdown, and a countdown the user cannot cut short is
+/// decoration. Called from the overlay's own dismiss button.
+#[tauri::command]
+#[specta::specta]
+pub fn dismiss_overlay_problem(app: AppHandle) {
+    crate::overlay::dismiss_problem(&app);
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn is_portable() -> bool {

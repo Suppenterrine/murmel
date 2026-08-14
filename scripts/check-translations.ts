@@ -197,6 +197,19 @@ function validateTranslations(): void {
 
   console.log("─".repeat(60));
 
+  const missingFromLocales = findKeysMissingFromLocales(referenceData);
+  if (missingFromLocales.length > 0) {
+    hasErrors = true;
+    console.log(
+      colorize(
+        `
+✗ ${missingFromLocales.length} key(s) used in the code but missing from every locale:`,
+        "red",
+      ),
+    );
+    missingFromLocales.forEach((key) => console.log(`    - ${key}`));
+  }
+
   // Summary
   const validCount = Object.values(results).filter((r) => r.valid).length;
   const totalCount = LANGUAGES.length;
@@ -222,3 +235,54 @@ function validateTranslations(): void {
 
 // Run validation
 validateTranslations();
+
+/**
+ * Keys the code asks for that no translation file has.
+ *
+ * The comparison above only holds the languages against each other, so a key
+ * that exists in neither passes it — and shows up in the UI as the raw
+ * `settings.foo.bar`. That has happened twice: once for the refinement model
+ * picker, once for a cancel button that had been wrong since it was written.
+ * Both were found by a person looking at the screen, which is the expensive way.
+ *
+ * Deliberately one-directional: unused keys in the files are not reported. A
+ * translation waiting for the code that will use it is not a defect, and
+ * failing the build over one would invite deleting it.
+ */
+function findKeysMissingFromLocales(reference: TranslationData): string[] {
+  const known = new Set(
+    getAllKeyPaths(reference).map((keyPath) => keyPath.join(".")),
+  );
+  // i18next resolves `foo_one` / `foo_other` from a single lookup of `foo`.
+  for (const key of [...known]) {
+    known.add(key.replace(/_(one|other|zero|two|few|many)$/, ""));
+  }
+
+  const sourceDir = path.join(__dirname, "..", "src");
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith(".tsx") || entry.name.endsWith(".ts"))
+        files.push(full);
+    }
+  };
+  walk(sourceDir);
+
+  // Only literal keys. A key built from a variable cannot be checked here, and
+  // guessing at one would produce false alarms that teach people to ignore this.
+  const pattern = /t\(\s*["'`]([a-zA-Z0-9_.]+)["'`]/g;
+  const missing = new Set<string>();
+
+  for (const file of files) {
+    const text = fs.readFileSync(file, "utf-8");
+    for (const match of text.matchAll(pattern)) {
+      const key = match[1];
+      if (!key.includes(".")) continue;
+      if (!known.has(key)) missing.add(key);
+    }
+  }
+
+  return [...missing].sort();
+}

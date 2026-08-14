@@ -616,7 +616,14 @@
         "rewrite": "Umgeschrieben"
       },
       "refinementRetry": "Erneut veredeln",
-      "refinementRetrying": "Läuft …"
+      "refinementRetrying": "Läuft …",
+      "filters": {
+        "all": "Alle",
+        "favorites": "Favoriten",
+        "dictation": "Diktate",
+        "command": "Befehle",
+        "rewrite": "Umgeschrieben"
+      }
     },
     "debug": {
       "title": "Debug",
@@ -803,7 +810,8 @@
     "open": "Öffnen",
     "copy": "Kopieren",
     "clear": "Leeren",
-    "noOptionsFound": "Keine Optionen gefunden"
+    "noOptionsFound": "Keine Optionen gefunden",
+    "cancel": "Abbrechen"
   },
   "accessibility": {
     "permissionsDescription": "Murmel benötigt Bedienungshilfen-Berechtigungen, um transkribierten Text einzugeben.",

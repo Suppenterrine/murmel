@@ -1,5 +1,11 @@
 import { listen } from "@tauri-apps/api/event";
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import "./RecordingOverlay.css";
 import { commands, events } from "@/bindings";
@@ -34,7 +40,7 @@ type ProblemReport = {
 
 /** How long a problem stays on screen before the overlay gives the desktop back.
  *  Long enough to read two lines, short enough not to sit in the way. */
-const PROBLEM_VISIBLE_MS = 6000;
+const PROBLEM_VISIBLE_MS = 8000;
 
 // Number of reactive bars in the waveform (the simple, smoothed style shared by
 // every overlay form). Mic levels arrive as 16 FFT buckets; we take the first N.
@@ -120,7 +126,13 @@ const RecordingOverlay: React.FC = () => {
       });
 
       const unlistenHide = await listen("hide-overlay", () => {
-        setIsVisible(false);
+        // A dictation that failed hides the overlay and reports the problem in
+        // the same breath. The hide belongs to the attempt that just ended; the
+        // problem is what replaced it, and it takes itself down on a timer.
+        setState((current) => {
+          if (current !== "problem") setIsVisible(false);
+          return current;
+        });
       });
 
       // A problem takes over the overlay: whatever was being shown has failed,
@@ -177,14 +189,22 @@ const RecordingOverlay: React.FC = () => {
     return () => clearInterval(id);
   }, [state, isVisible]);
 
+  // Takes the message off screen and lets the backend hide the window with it.
+  // Both halves are needed: the card fading out leaves a transparent window
+  // sitting over the desktop otherwise.
+  const dismissProblem = useCallback(() => {
+    setIsVisible(false);
+    void commands.dismissOverlayProblem();
+  }, []);
+
   // A problem gives the desktop back on its own. Unlike the working states it
   // has nothing following it that would take the overlay down — the dictation it
   // belonged to is over.
   useEffect(() => {
     if (state !== "problem" || !isVisible) return;
-    const id = setTimeout(() => setIsVisible(false), PROBLEM_VISIBLE_MS);
+    const id = setTimeout(dismissProblem, PROBLEM_VISIBLE_MS);
     return () => clearTimeout(id);
-  }, [state, isVisible, problem]);
+  }, [state, isVisible, problem, dismissProblem]);
 
   // Stick to the bottom as text streams in — but only while pinned, so a user who
   // has scrolled up to read history isn't yanked back down by the next chunk.
@@ -318,16 +338,29 @@ const RecordingOverlay: React.FC = () => {
         )}
       </div>
       <div className="sbase-r">
+        {/* The ring winds down over the time the message has left, so the user
+            can see it is going rather than wonder whether it is stuck — and can
+            cut it short instead of waiting. */}
         <button
-          className="scancel"
-          onClick={() => setIsVisible(false)}
+          className="sx sdismiss"
+          onClick={dismissProblem}
           title={t("problem.dismiss")}
           aria-label={t("problem.dismiss")}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
+          {/* Two layers: the ring rides the rim of the button's own circle, the
+              cross keeps the size it has everywhere else. Drawing both in one
+              SVG made the ring's stroke eat into the glyph. */}
+          <svg
+            className="sdismiss-ring-svg"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle className="sdismiss-track" cx="12" cy="12" r="11" />
+            <circle className="sdismiss-ring" cx="12" cy="12" r="11" />
+          </svg>
+          <svg viewBox="0 0 16 16" aria-hidden="true">
             <path
-              d="M18 6 6 18M6 6l12 12"
-              fill="none"
+              d="M4 4 L12 12 M12 4 L4 12"
               stroke="currentColor"
               strokeWidth="1.6"
               strokeLinecap="round"

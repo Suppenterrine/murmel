@@ -1,7 +1,8 @@
 use crate::actions::process_transcription_output;
 use crate::managers::{
     history::{
-        HistoryEntry, HistoryManager, PaginatedHistory, TranscriptionUpdate, UsageRow, UsageSummary,
+        EntryKind, HistoryEntry, HistoryManager, PaginatedHistory, TranscriptionUpdate, UsageRow,
+        UsageSummary,
     },
     transcription::TranscriptionManager,
 };
@@ -35,10 +36,11 @@ pub async fn search_history_entries(
     history_manager: State<'_, Arc<HistoryManager>>,
     query: Option<String>,
     only_saved: bool,
+    kind: Option<EntryKind>,
     limit: Option<usize>,
 ) -> Result<Vec<HistoryEntry>, String> {
     history_manager
-        .search_history_entries(query, only_saved, limit)
+        .search_history_entries(query, only_saved, kind, limit)
         .await
         .map_err(|e| e.to_string())
 }

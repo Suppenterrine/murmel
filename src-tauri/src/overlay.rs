@@ -3,7 +3,7 @@ use crate::settings;
 use crate::settings::{OverlayPosition, OverlayStyle};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 
 #[cfg(not(target_os = "macos"))]
@@ -66,6 +66,26 @@ fn overlay_dimensions(state: &str) -> (f64, f64) {
         _ => (OVERLAY_WIDTH, OVERLAY_HEIGHT),
     }
 }
+
+/// Bumped every time something is shown in the overlay.
+///
+/// Hiding is delayed by the fade-out, so a hide and a show can overlap: the
+/// stale hide would otherwise win simply by arriving last. Whoever schedules a
+/// hide records the generation it belongs to and stands down if anything has
+/// been shown since.
+static OVERLAY_GENERATION: AtomicU64 = AtomicU64::new(0);
+
+/// How long a problem stays readable. Mirrored in `RecordingOverlay.tsx`, which
+/// runs the countdown the user sees.
+const PROBLEM_VISIBLE: Duration = Duration::from_secs(8);
+
+/// Whether a problem currently owns the overlay.
+///
+/// A failure arrives in the middle of a dictation shutting down: the transcript
+/// still gets pasted, the tray icon still goes idle, the overlay still gets
+/// hidden. Each of those is correct for the dictation and wrong for the message
+/// that replaced it, so while this is set they leave the overlay alone.
+static PROBLEM_SHOWN: AtomicBool = AtomicBool::new(false);
 
 static LAST_MIC_LEVEL_EMIT: AtomicU64 = AtomicU64::new(0);
 const EMIT_THROTTLE_MS: u64 = 33; // ~30 FPS
@@ -569,6 +589,16 @@ fn show_overlay_state(app_handle: &AppHandle, state: &str) {
 }
 
 fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
+    // Claim the overlay for this state, so any hide still counting down from the
+    // previous one leaves it alone.
+    OVERLAY_GENERATION.fetch_add(1, Ordering::SeqCst);
+
+    // A new dictation outranks the last one's error message: the user has moved
+    // on, and leaving the flag set would strand the overlay on screen for good.
+    if state != "problem" {
+        PROBLEM_SHOWN.store(false, Ordering::SeqCst);
+    }
+
     // Size the overlay for this state (compact vs. streaming), then position it.
     let (width, height) = overlay_dimensions(state);
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
@@ -698,6 +728,11 @@ pub fn show_problem(app_handle: &AppHandle, report: &crate::problem::ProblemRepo
         return;
     }
 
+    // Claimed before anything is shown: the failing dictation is still winding
+    // down behind this — pasting, resetting the tray, hiding the overlay — and
+    // every one of those steps would otherwise take the message down with it.
+    PROBLEM_SHOWN.store(true, Ordering::SeqCst);
+
     let handle = app_handle.clone();
     let report = report.clone();
     let _ = app_handle.run_on_main_thread(move || {
@@ -706,6 +741,31 @@ pub fn show_problem(app_handle: &AppHandle, report: &crate::problem::ProblemRepo
             let _ = window.emit("show-problem", report);
         }
     });
+
+    // The window comes down on its own once the message has had its time. The
+    // frontend fades the card out a little earlier; this is what actually gives
+    // the desktop back.
+    let handle = app_handle.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(PROBLEM_VISIBLE + Duration::from_millis(400));
+        if PROBLEM_SHOWN.swap(false, Ordering::SeqCst) {
+            if let Some(window) = handle.get_webview_window("recording_overlay") {
+                let _ = window.hide();
+            }
+        }
+    });
+}
+
+/// Take a problem off the screen at the user's request.
+///
+/// A message that says "this will disappear" has to honour being dismissed
+/// early, or the countdown is decoration.
+pub fn dismiss_problem(app_handle: &AppHandle) {
+    if PROBLEM_SHOWN.swap(false, Ordering::SeqCst) {
+        if let Some(window) = app_handle.get_webview_window("recording_overlay") {
+            let _ = window.hide();
+        }
+    }
 }
 
 /// Updates the overlay window position based on current settings
@@ -755,16 +815,30 @@ fn update_overlay_position_on_main(app_handle: &AppHandle) {
 
 /// Hides the recording overlay window with fade-out animation
 pub fn hide_recording_overlay(app_handle: &AppHandle) {
+    // A problem is showing where the dictation used to be. This call belongs to
+    // that dictation finishing up, and taking the message down with it is how a
+    // failure ends up looking like nothing happened at all.
+    if PROBLEM_SHOWN.load(Ordering::SeqCst) {
+        return;
+    }
+
     // Always hide the overlay regardless of settings - if setting was changed while recording,
     // we still want to hide it properly
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
         // Emit event to trigger fade-out animation
         let _ = overlay_window.emit("hide-overlay", ());
-        // Hide the window after a short delay to allow animation to complete
+
+        // The actual hide waits for the fade to finish — and by then something
+        // newer may already be on screen. A failed dictation hides the overlay
+        // and reports the problem in the same breath, and without this check the
+        // hide scheduled 300ms ago would take the error message down with it.
+        let generation = OVERLAY_GENERATION.load(Ordering::SeqCst);
         let window_clone = overlay_window.clone();
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(300));
-            let _ = window_clone.hide();
+            if OVERLAY_GENERATION.load(Ordering::SeqCst) == generation {
+                let _ = window_clone.hide();
+            }
         });
     }
 }

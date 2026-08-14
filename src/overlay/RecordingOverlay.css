@@ -270,6 +270,61 @@
   line-height: 1.2;
 }
 
+/* Dismiss button with the remaining time drawn around it.
+   The ring answers the question a disappearing message always raises — "is it
+   going away, or is it stuck?" — and the button answers "can I make it go away
+   now?". Neither is much use without the other. */
+.sdismiss {
+  position: relative;
+  /* The ring is drawn on the rim, and a round stroke needs somewhere to sit. */
+  overflow: visible;
+}
+
+/* The ring layer covers the whole button, so the countdown traces the edge of
+   the grey circle rather than shrinking the cross inside it. */
+.sdismiss-ring-svg {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: visible;
+}
+.sdismiss-track,
+.sdismiss-ring {
+  fill: none;
+  stroke-width: 1.8;
+}
+.sdismiss-track {
+  stroke: currentColor;
+  opacity: 0.16;
+}
+.sdismiss-ring {
+  stroke: currentColor;
+  opacity: 0.75;
+  stroke-linecap: round;
+  /* 2πr for r=11, rounded up. Starts as a full circle and unwinds to nothing. */
+  stroke-dasharray: 70;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  animation: sdismiss-countdown 8s linear forwards;
+}
+@keyframes sdismiss-countdown {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 70;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Without the animation the ring would sit there as a full circle, implying
+     time that is not left. Better to show nothing than to show it wrong. */
+  .sdismiss-ring {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* Command Mode carries a word where the other modes carry a 11px icon, and the
    resting pill has no room for it: the label alone is wider than the waveform,
    and the equal side columns below would demand the same width again on the

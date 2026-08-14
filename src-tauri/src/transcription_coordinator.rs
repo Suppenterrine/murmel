@@ -75,8 +75,23 @@ pub struct TranscriptionCoordinator {
     tx: Sender<Command>,
 }
 
+/// Whether this binding starts a recording, and therefore belongs to the
+/// coordinator rather than to the plain press/release path.
+///
+/// Every hotkey that records goes through here, and that is what makes the
+/// push-to-talk setting mean one thing across all of them. Command Mode was
+/// missing from this list and inherited hold-to-talk regardless of the setting
+/// — a hotkey that obeys a different rule than its neighbours is not a variant,
+/// it is a bug.
+///
+/// Hotkeys that do not record — rewriting a selection, capturing a correction —
+/// are deliberately absent: they act once on a press, and there is no duration
+/// for a mode to apply to.
 pub fn is_transcribe_binding(id: &str) -> bool {
-    id == "transcribe" || id == "transcribe_with_post_process"
+    matches!(
+        id,
+        "transcribe" | "transcribe_with_post_process" | "command_mode"
+    )
 }
 
 impl TranscriptionCoordinator {

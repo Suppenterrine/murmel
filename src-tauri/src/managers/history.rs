@@ -1355,14 +1355,19 @@ impl HistoryManager {
         (!query.is_empty()).then_some(query)
     }
 
-    /// Search transcripts, optionally limited to saved entries.
+    /// Search transcripts, optionally limited to saved entries or to one kind.
     ///
     /// An empty query is not an error — it means "no text filter", so the
-    /// favourites toggle works on its own.
+    /// favourites toggle and the kind filter work on their own.
+    ///
+    /// Filtering happens here rather than over the loaded page: the list is
+    /// paginated, so a filter applied in the frontend would only ever find the
+    /// entries that happen to have been scrolled to.
     pub async fn search_history_entries(
         &self,
         query: Option<String>,
         only_saved: bool,
+        kind: Option<EntryKind>,
         limit: Option<usize>,
     ) -> Result<Vec<HistoryEntry>> {
         let conn = self.get_connection()?;
@@ -1370,6 +1375,13 @@ impl HistoryManager {
         let fts_query = query.as_deref().and_then(Self::to_fts_query);
 
         let saved_clause = if only_saved { " AND h.saved = 1" } else { "" };
+        // Interpolated, not bound: the value comes from a fixed set of variants,
+        // never from user text.
+        let kind_clause = match kind {
+            Some(kind) => format!(" AND h.kind = '{}'", kind.as_str()),
+            None => String::new(),
+        };
+        let saved_clause = format!("{saved_clause}{kind_clause}");
 
         let (sql, params): (String, Vec<Box<dyn rusqlite::ToSql>>) = match fts_query {
             Some(fts) => (
@@ -2009,6 +2021,37 @@ mod tests {
             assert_eq!(day.len(), 10, "expected YYYY-MM-DD, got {day}");
             assert!(*words > 0);
         }
+    }
+
+    /// The kind filter narrows to one sort of entry and leaves the others out.
+    /// Checked against the same SQL the manager builds, because a filter that
+    /// silently matches everything looks exactly like one that works.
+    #[test]
+    fn filtering_by_kind_returns_only_that_kind() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "ein diktat", None);
+        insert_rewrite(&conn, 200, EntryKind::Command, "mach das kuerzer");
+        insert_rewrite(&conn, 300, EntryKind::Rewrite, "markierter text");
+
+        let for_kind = |kind: Option<EntryKind>| -> Vec<String> {
+            let clause = match kind {
+                Some(kind) => format!(" AND h.kind = '{}'", kind.as_str()),
+                None => String::new(),
+            };
+            let sql = format!("{ENTRY_SELECT} WHERE 1 = 1{clause} ORDER BY h.id DESC");
+            let mut stmt = conn.prepare(&sql).expect("prepare");
+            let rows = stmt
+                .query_map([], |row| row.get::<_, String>("transcription_text"))
+                .expect("query")
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .expect("collect");
+            rows
+        };
+
+        assert_eq!(for_kind(None).len(), 3);
+        assert_eq!(for_kind(Some(EntryKind::Command)), vec!["mach das kuerzer"]);
+        assert_eq!(for_kind(Some(EntryKind::Rewrite)), vec!["markierter text"]);
+        assert_eq!(for_kind(Some(EntryKind::Dictation)), vec!["ein diktat"]);
     }
 
     /// The whole point of the `kind` column: an instruction like "kürzer" is

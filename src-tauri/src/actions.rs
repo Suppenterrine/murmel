@@ -626,6 +626,10 @@ pub(crate) async fn process_transcription_output(
                 final_text = processed_text;
             }
             Err(reason) => {
+                // The raw transcript is still pasted, so nothing is lost — but
+                // without a word here the only symptom is text that quietly
+                // arrives unrefined, which reads as "the setting does nothing".
+                crate::problem::report(app, Problem::RefinementFailed, Some(reason.clone()));
                 runs.push(build_llm_run(
                     &settings,
                     prompt_id,
@@ -790,7 +794,9 @@ async fn process_command_output(
                 duration_ms,
                 Some(reason.clone()),
             );
-            error!("Command Mode failed: {reason}");
+            // Unlike a dictation, nothing arrives at all here — the selection is
+            // left as it was. Saying so is the only sign the key did anything.
+            crate::problem::report(app, Problem::RefinementFailed, Some(reason));
             (None, vec![run])
         }
     }

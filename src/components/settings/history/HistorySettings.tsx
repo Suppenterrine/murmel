@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import {
   commands,
   events,
+  type EntryKind,
   type HistoryEntry,
   type HistoryUpdatePayload,
 } from "@/bindings";
@@ -78,9 +79,13 @@ export const HistorySettings: React.FC = () => {
   const [hasMore, setHasMore] = useState(true);
   const [search, setSearch] = useState("");
   const [onlySaved, setOnlySaved] = useState(false);
+  // Which kind of entry to show, or all of them. Applied in SQL, not over the
+  // loaded page: the list is paginated, so filtering here would only ever find
+  // what the user had already scrolled to.
+  const [kind, setKind] = useState<EntryKind | null>(null);
   // Any active filter switches from cursor paging to a ranked search, so the
   // two never have to agree on what a cursor means.
-  const isFiltered = search.trim().length > 0 || onlySaved;
+  const isFiltered = search.trim().length > 0 || onlySaved || kind !== null;
   const sentinelRef = useRef<HTMLDivElement>(null);
   const entriesRef = useRef<HistoryEntry[]>([]);
   const loadingRef = useRef(false);
@@ -136,6 +141,7 @@ export const HistorySettings: React.FC = () => {
         const result = await commands.searchHistoryEntries(
           search.trim() || null,
           onlySaved,
+          kind,
           100,
         );
         if (cancelled) return;
@@ -155,7 +161,7 @@ export const HistorySettings: React.FC = () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [search, onlySaved, isFiltered]);
+  }, [search, onlySaved, kind, isFiltered]);
 
   // Infinite scroll via IntersectionObserver
   useEffect(() => {
@@ -352,13 +358,43 @@ export const HistorySettings: React.FC = () => {
               className="w-full ps-9 pe-3 py-2 text-sm rounded-md bg-background border border-mid-gray/20 text-text placeholder:text-text/40 focus:outline-none focus:border-logo-primary/50"
             />
           </div>
-          <IconButton
-            onClick={() => setOnlySaved((previous) => !previous)}
-            title={t("settings.history.onlyFavorites")}
+        </div>
+
+        {/*
+         * The kinds exist in the data, so they may as well be reachable. A row
+         * of filters costs one click where scrolling the whole history cost a
+         * search term the user would have to guess.
+         *
+         * Favourites sits in the same row rather than in its own corner: it is
+         * the same kind of question — "show me only these" — and having one
+         * form of filtering as a lone icon button beside another as chips
+         * suggested a difference that isn't there.
+         */}
+        <div className="px-4 flex items-center gap-1.5 flex-wrap">
+          <FilterChip
+            active={!onlySaved && kind === null}
+            onClick={() => {
+              setOnlySaved(false);
+              setKind(null);
+            }}
+            label={t("settings.history.filters.all")}
+          />
+          <FilterChip
             active={onlySaved}
-          >
-            <Star className={`w-4 h-4 ${onlySaved ? "fill-current" : ""}`} />
-          </IconButton>
+            onClick={() => setOnlySaved((previous) => !previous)}
+            label={t("settings.history.filters.favorites")}
+            icon={
+              <Star className={`w-3 h-3 ${onlySaved ? "fill-current" : ""}`} />
+            }
+          />
+          {(["dictation", "command", "rewrite"] as const).map((value) => (
+            <FilterChip
+              key={value}
+              active={kind === value}
+              onClick={() => setKind((prev) => (prev === value ? null : value))}
+              label={t(`settings.history.filters.${value}`)}
+            />
+          ))}
         </div>
 
         <div className="bg-background border border-mid-gray/20 rounded-lg overflow-visible">
@@ -368,6 +404,34 @@ export const HistorySettings: React.FC = () => {
     </div>
   );
 };
+
+/**
+ * One filter in the history's filter row.
+ *
+ * Its own component because there are five of them and the active/inactive
+ * treatment is the only thing that distinguishes them — repeated inline, a
+ * single one of the five would eventually drift.
+ */
+const FilterChip: React.FC<{
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon?: React.ReactNode;
+}> = ({ active, onClick, label, icon }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={active}
+    className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors ${
+      active
+        ? "bg-logo-primary/15 text-logo-primary font-medium"
+        : "text-text/55 hover:text-text hover:bg-mid-gray/10"
+    }`}
+  >
+    {icon}
+    {label}
+  </button>
+);
 
 interface HistoryEntryProps {
   entry: HistoryEntry;
