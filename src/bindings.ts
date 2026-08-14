@@ -1045,6 +1045,13 @@ async retryHistoryEntryTranscription(id: number) : Promise<Result<null, string>>
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Run refinement over an entry again, after a failed attempt.
+ * 
+ * Nothing is pasted: the user is looking at the history, not at the window the
+ * text was meant for. The result lands on the entry, where it can be read and
+ * copied.
+ */
 async retryHistoryEntryRefinement(id: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("retry_history_entry_refinement", { id }) };
