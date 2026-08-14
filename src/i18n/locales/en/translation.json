@@ -416,6 +416,7 @@
           "freeOnly": "Free only",
           "refresh": "Reload list",
           "active": "Active",
+          "activeSection": "Selected model",
           "installed": "Installed models",
           "available": "Available models",
           "context": "{{thousands}}k context",

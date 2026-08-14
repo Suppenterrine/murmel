@@ -416,6 +416,7 @@
           "freeOnly": "Nur kostenlose",
           "refresh": "Liste neu laden",
           "active": "Aktiv",
+          "activeSection": "Ausgewähltes Modell",
           "installed": "Installierte Modelle",
           "available": "Verfügbare Modelle",
           "context": "{{thousands}}k Kontext",

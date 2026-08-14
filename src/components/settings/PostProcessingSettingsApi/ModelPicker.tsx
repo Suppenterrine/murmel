@@ -124,10 +124,102 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     });
   }, [remoteModels, query, freeOnly]);
 
+  /**
+   * The chosen model, pulled out of the list into its own section.
+   *
+   * Otherwise it sits wherever the sort order puts it — with several hundred
+   * entries that can be far down, and "which one am I actually using" becomes a
+   * scrolling exercise. Deliberately shown even when the search would filter it
+   * out: the question it answers is not "what did I search for".
+   */
+  const activeLocal = useMemo(
+    () =>
+      activeProviderId === OLLAMA_PROVIDER_ID
+        ? (localModels.find((model) => model.name === activeModel) ?? null)
+        : null,
+    [localModels, activeProviderId, activeModel],
+  );
+
+  const activeRemote = useMemo(
+    () =>
+      activeProviderId === OPENROUTER_PROVIDER_ID
+        ? (remoteModels.find((model) => model.id === activeModel) ?? null)
+        : null,
+    [remoteModels, activeProviderId, activeModel],
+  );
+
   const isEmpty =
     !loading &&
     !error &&
     (source === "local" ? visibleLocal : visibleRemote).length === 0;
+
+  const localCard = (model: LocalModel) => (
+    <ModelCard
+      key={model.name}
+      title={model.name}
+      subtitle={model.family ?? ""}
+      active={
+        model.name === activeModel && activeProviderId === OLLAMA_PROVIDER_ID
+      }
+      activeLabel={t("settings.postProcessing.api.models.active")}
+      onSelect={() => onPick(OLLAMA_PROVIDER_ID, model.name)}
+      facts={[
+        {
+          icon: <HardDrive className="w-3.5 h-3.5" />,
+          text: `${(model.size_bytes / 1024 ** 3).toFixed(1)} GB`,
+        },
+        model.parameter_size
+          ? {
+              icon: <Cpu className="w-3.5 h-3.5" />,
+              text: model.parameter_size,
+            }
+          : null,
+        model.quantization
+          ? {
+              icon: <Sparkles className="w-3.5 h-3.5" />,
+              text: model.quantization,
+            }
+          : null,
+      ]}
+    />
+  );
+
+  const remoteCard = (model: RemoteModel) => (
+    <ModelCard
+      key={model.id}
+      title={model.name}
+      subtitle={model.id}
+      active={
+        model.id === activeModel && activeProviderId === OPENROUTER_PROVIDER_ID
+      }
+      activeLabel={t("settings.postProcessing.api.models.active")}
+      badge={
+        model.is_free ? t("settings.postProcessing.api.models.free") : undefined
+      }
+      onSelect={() => onPick(OPENROUTER_PROVIDER_ID, model.id)}
+      facts={[
+        {
+          icon: <Cpu className="w-3.5 h-3.5" />,
+          text: t("settings.postProcessing.api.models.context", {
+            thousands: Math.round(model.context_length / 1000),
+          }),
+        },
+        model.is_free
+          ? null
+          : {
+              icon: <Coins className="w-3.5 h-3.5" />,
+              text: t("settings.postProcessing.api.models.perDictation", {
+                cents: (costPerDictation(model, words) * 100).toFixed(3),
+              }),
+            },
+      ]}
+    />
+  );
+
+  const activeCard =
+    source === "local"
+      ? activeLocal && localCard(activeLocal)
+      : activeRemote && remoteCard(activeRemote);
 
   return (
     <div className="w-full space-y-4">
@@ -160,6 +252,17 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           className="w-full ps-9 pe-3 py-2 text-sm bg-mid-gray/10 border border-mid-gray/40 rounded-lg focus:outline-none focus:ring-1 focus:ring-logo-primary placeholder:text-text/40"
         />
       </div>
+
+      {/* The chosen model gets its own section above the catalogue, so it is
+          always the first thing seen and never buried in a long list. */}
+      {activeCard && !loading && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-text/60">
+            {t("settings.postProcessing.api.models.activeSection")}
+          </h3>
+          {activeCard}
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-medium text-text/60">
@@ -228,77 +331,12 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       <div className="space-y-3">
         {!loading &&
           (source === "local"
-            ? visibleLocal.map((model) => (
-                <ModelCard
-                  key={model.name}
-                  title={model.name}
-                  subtitle={model.family ?? ""}
-                  active={
-                    activeProviderId === OLLAMA_PROVIDER_ID &&
-                    activeModel === model.name
-                  }
-                  activeLabel={t("settings.postProcessing.api.models.active")}
-                  onSelect={() => onPick(OLLAMA_PROVIDER_ID, model.name)}
-                  facts={[
-                    {
-                      icon: <HardDrive className="w-3.5 h-3.5" />,
-                      text: `${(model.size_bytes / 1024 ** 3).toFixed(1)} GB`,
-                    },
-                    model.parameter_size
-                      ? {
-                          icon: <Cpu className="w-3.5 h-3.5" />,
-                          text: model.parameter_size,
-                        }
-                      : null,
-                    model.quantization
-                      ? {
-                          icon: <Sparkles className="w-3.5 h-3.5" />,
-                          text: model.quantization,
-                        }
-                      : null,
-                  ]}
-                />
-              ))
-            : visibleRemote.map((model) => (
-                <ModelCard
-                  key={model.id}
-                  title={model.name}
-                  subtitle={model.id}
-                  active={
-                    activeProviderId === OPENROUTER_PROVIDER_ID &&
-                    activeModel === model.id
-                  }
-                  activeLabel={t("settings.postProcessing.api.models.active")}
-                  badge={
-                    model.is_free
-                      ? t("settings.postProcessing.api.models.free")
-                      : undefined
-                  }
-                  onSelect={() => onPick(OPENROUTER_PROVIDER_ID, model.id)}
-                  facts={[
-                    {
-                      icon: <Cpu className="w-3.5 h-3.5" />,
-                      text: t("settings.postProcessing.api.models.context", {
-                        thousands: Math.round(model.context_length / 1000),
-                      }),
-                    },
-                    model.is_free
-                      ? null
-                      : {
-                          icon: <Coins className="w-3.5 h-3.5" />,
-                          text: t(
-                            "settings.postProcessing.api.models.perDictation",
-                            {
-                              cents: (
-                                costPerDictation(model, words) * 100
-                              ).toFixed(3),
-                            },
-                          ),
-                        },
-                  ]}
-                />
-              )))}
-
+            ? visibleLocal
+                .filter((model) => model.name !== activeLocal?.name)
+                .map(localCard)
+            : visibleRemote
+                .filter((model) => model.id !== activeRemote?.id)
+                .map(remoteCard))}
         {isEmpty && (
           <div className="text-center py-8 text-text/50">
             {t("settings.postProcessing.api.models.noMatches")}
