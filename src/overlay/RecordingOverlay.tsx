@@ -320,7 +320,11 @@ const RecordingOverlay: React.FC = () => {
       className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
     >
       <div
-        className={`scard compact ${working && isVisible ? "cworking" : ""}`}
+        className={`scard compact ${working && isVisible ? "cworking" : ""} ${
+          // Only while listening: the working row has no label beside its
+          // spinner, so it needs neither the extra width nor the shifted grid.
+          !working && intent === "command" ? "cintent" : ""
+        }`}
       >
         {working ? workingRow(workLabel, true) : listeningRow(false, true)}
       </div>

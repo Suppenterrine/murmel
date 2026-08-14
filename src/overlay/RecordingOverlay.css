@@ -226,6 +226,18 @@
   width: var(--ov-work-w);
 }
 
+/* Command Mode carries a word where the other modes carry a 11px icon, and the
+   resting pill has no room for it: the label alone is wider than the waveform,
+   and the equal side columns below would demand the same width again on the
+   right. Both are relaxed for this one case — the pill widens, and the waveform
+   gives up being centred rather than being squeezed out of the row. */
+.scard.compact.cintent {
+  width: var(--ov-work-w);
+}
+.scard.compact.cintent .sbase {
+  grid-template-columns: auto auto minmax(22px, 1fr);
+}
+
 /* text region — auto-height open via grid-rows trick; region fades as a whole */
 .stext {
   display: grid;
@@ -326,6 +338,9 @@
    instruction before they start speaking. */
 .sintent {
   flex: none;
+  /* The waveform brings its own padding on the right but none on the left, so
+     without this the label sits flush against the first bar. */
+  margin-inline-end: 6px;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
