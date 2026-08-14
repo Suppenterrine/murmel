@@ -272,6 +272,22 @@ async searchHistoryEntries(query: string | null, onlySaved: boolean, limit: numb
     else return { status: "error", error: e  as any };
 }
 },
+async hasPostProcessApiKey(providerId: string) : Promise<Result<boolean, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("has_post_process_api_key", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deletePostProcessApiKey(providerId: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_post_process_api_key", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async listLocalLlmModels() : Promise<Result<LocalModel[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("list_local_llm_models") };

@@ -93,18 +93,16 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
 
       await setPostProcessProvider(providerId);
 
-      // Auto-fetch available models for the new provider so the model dropdown
-      // reflects what's actually valid. Without this, a stale model value from
-      // a previous provider/base_url can persist and silently 404 at runtime.
-      // Skip when the provider isn't configured yet (no API key / empty base URL)
-      // to avoid unnecessary backend errors.
+      // Refresh the model list for the new provider, so a model left over from
+      // the previous one cannot linger and 404 at runtime.
+      //
+      // No longer gated on an API key being present: keys live in the system
+      // credential store now, and the frontend does not get to see them. The
+      // providers that need one report a clear error instead, which is more
+      // useful than silently skipping the request.
       if (providerId !== APPLE_PROVIDER_ID) {
         const provider = providers.find((p) => p.id === providerId);
-        const apiKey = settings?.post_process_api_keys?.[providerId] ?? "";
-        const hasBaseUrl = (provider?.base_url ?? "").trim() !== "";
-        const hasApiKey = apiKey.trim() !== "";
-
-        if (provider?.id === "custom" ? hasBaseUrl : hasApiKey) {
+        if ((provider?.base_url ?? "").trim() !== "") {
           void fetchPostProcessModels(providerId);
         }
       }
@@ -114,7 +112,6 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
       setPostProcessProvider,
       fetchPostProcessModels,
       providers,
-      settings,
     ],
   );
 

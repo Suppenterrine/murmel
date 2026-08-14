@@ -818,8 +818,50 @@ fn default_typing_tool() -> TypingTool {
     TypingTool::Auto
 }
 
-fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
+/// Move any keys still sitting in the settings file into the system credential
+/// store, then clear them from the file.
+///
+/// Runs on every settings load and is a no-op once done — the loop only has
+/// something to do while a non-empty value remains. Deliberately *not*
+/// versioned like the presets: a key written back by an older build would
+/// otherwise stay in clear text forever.
+///
+/// If the store refuses, the value stays where it is. Dropping it would lose
+/// the user's credentials; leaving it is the status quo, and the settings
+/// screen reports the failure when they next save.
+fn migrate_api_keys_to_keychain(settings: &mut AppSettings) -> bool {
     let mut changed = false;
+
+    let stored: Vec<(String, String)> = settings
+        .post_process_api_keys
+        .iter()
+        .filter(|(_, key)| !key.trim().is_empty())
+        .map(|(id, key)| (id.clone(), key.clone()))
+        .collect();
+
+    for (provider_id, key) in stored {
+        match crate::secrets::set_api_key(&provider_id, &key) {
+            Ok(()) => {
+                log::info!(
+                    "Moved API key for '{}' into the credential store",
+                    provider_id
+                );
+                settings
+                    .post_process_api_keys
+                    .insert(provider_id, String::new());
+                changed = true;
+            }
+            Err(err) => {
+                warn!("Keeping API key for '{}' in settings: {}", provider_id, err);
+            }
+        }
+    }
+
+    changed
+}
+
+fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
+    let mut changed = migrate_api_keys_to_keychain(settings);
     for provider in default_post_process_providers() {
         // Use match to do a single lookup - either sync existing or add new
         match settings
@@ -883,11 +925,9 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
         .collect();
 
     settings.post_process_providers.retain(|provider| {
-        let keep = known.contains(&provider.id)
-            || settings
-                .post_process_api_keys
-                .get(&provider.id)
-                .is_some_and(|key| !key.trim().is_empty());
+        // Asks the credential store, which is where keys live since they were
+        // moved out of this file.
+        let keep = known.contains(&provider.id) || crate::secrets::has_api_key(&provider.id);
 
         if !keep {
             debug!("Removing retired post-process provider '{}'", provider.id);
@@ -1352,6 +1392,9 @@ mod tests {
             models_endpoint: Some("/models".to_string()),
             supports_structured_output: false,
         });
+        // The key goes through the settings file, exactly as it would on an
+        // installation upgrading from before the move — the migration should
+        // carry it into the credential store and keep the provider alive.
         settings
             .post_process_api_keys
             .insert("anthropic".to_string(), "sk-ant-configured".to_string());
@@ -1365,10 +1408,17 @@ mod tests {
             .collect();
 
         assert!(!ids.contains(&"groq"), "unconfigured provider should go");
-        assert!(
-            ids.contains(&"anthropic"),
-            "a provider holding the user's API key must not vanish silently"
-        );
+
+        // Without a credential store (headless CI) the key cannot be migrated,
+        // and the provider is dropped. Asserting it stayed would then report a
+        // missing daemon as a broken feature.
+        if crate::secrets::has_api_key("anthropic") {
+            assert!(
+                ids.contains(&"anthropic"),
+                "a provider holding the user's API key must not vanish silently"
+            );
+            let _ = crate::secrets::delete_api_key("anthropic");
+        }
     }
 
     /// Losing the active provider must not leave the setting pointing at

@@ -446,8 +446,14 @@
           "placeholder": "http://localhost:11434/v1"
         },
         "apiKey": {
+          "stored": "Schlüssel hinterlegt",
+          "saved": "Gespeichert",
+          "save": "Speichern",
+          "saving": "Speichere …",
+          "replace": "Ersetzen",
+          "remove": "Schlüssel entfernen",
           "title": "API-Schlüssel",
-          "description": "API-Schlüssel für den ausgewählten Anbieter.",
+          "description": "API-Schlüssel für den ausgewählten Anbieter. Wird im Schlüsselbund des Betriebssystems abgelegt, nicht in Murmels Einstellungsdatei.",
           "placeholder": "sk-..."
         },
         "model": {

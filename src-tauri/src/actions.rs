@@ -195,11 +195,8 @@ async fn post_process_transcription(
         provider.id, model
     );
 
-    let api_key = settings
-        .post_process_api_keys
-        .get(&provider.id)
-        .cloned()
-        .unwrap_or_default();
+    // From the system credential store, not from the settings file.
+    let api_key = crate::secrets::get_api_key(&provider.id).unwrap_or_default();
 
     // Ask these providers to skip reasoning/thinking — post-processing rarely
     // benefits from it and it adds seconds of latency. llm_client picks the

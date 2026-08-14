@@ -18,6 +18,7 @@ mod overlay;
 mod paste_tx;
 pub mod portable;
 mod post_process_models;
+mod secrets;
 mod secure_input;
 mod settings;
 mod shortcut;
@@ -682,6 +683,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_experimental_enabled_setting,
             shortcut::change_post_process_base_url_setting,
             shortcut::change_post_process_api_key_setting,
+            shortcut::has_post_process_api_key,
+            shortcut::delete_post_process_api_key,
             shortcut::change_post_process_model_setting,
             shortcut::set_post_process_provider,
             shortcut::fetch_post_process_models,

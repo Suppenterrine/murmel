@@ -446,8 +446,14 @@
           "placeholder": "http://localhost:11434/v1"
         },
         "apiKey": {
+          "stored": "Key stored",
+          "saved": "Saved",
+          "save": "Save",
+          "saving": "Saving…",
+          "replace": "Replace",
+          "remove": "Remove key",
           "title": "API Key",
-          "description": "API key for the selected provider.",
+          "description": "API key for the selected provider. Stored in the system credential store, never in Murmel's settings file.",
           "placeholder": "sk-..."
         },
         "model": {

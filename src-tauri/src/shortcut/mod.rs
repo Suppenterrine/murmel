@@ -1057,6 +1057,11 @@ fn validate_provider_exists(
     Ok(())
 }
 
+/// Store an API key in the system credential store.
+///
+/// An empty value removes it, so a cleared field needs no separate command.
+/// Errors are returned rather than swallowed: the user has to know when a key
+/// was *not* saved, or they will wonder why requests keep failing.
 #[tauri::command]
 #[specta::specta]
 pub fn change_post_process_api_key_setting(
@@ -1064,11 +1069,25 @@ pub fn change_post_process_api_key_setting(
     provider_id: String,
     api_key: String,
 ) -> Result<(), String> {
-    let mut settings = settings::get_settings(&app);
+    let settings = settings::get_settings(&app);
     validate_provider_exists(&settings, &provider_id)?;
-    settings.post_process_api_keys.insert(provider_id, api_key);
-    settings::write_settings(&app, settings);
-    Ok(())
+    crate::secrets::set_api_key(&provider_id, &api_key)
+}
+
+/// Whether a key is stored for this provider.
+///
+/// The key itself is never handed to the frontend — it has no use for the
+/// value, only for the fact that one exists.
+#[tauri::command]
+#[specta::specta]
+pub fn has_post_process_api_key(provider_id: String) -> bool {
+    crate::secrets::has_api_key(&provider_id)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn delete_post_process_api_key(provider_id: String) -> Result<(), String> {
+    crate::secrets::delete_api_key(&provider_id)
 }
 
 #[tauri::command]
@@ -1198,12 +1217,8 @@ pub async fn fetch_post_process_models(
         }
     }
 
-    // Get API key
-    let api_key = settings
-        .post_process_api_keys
-        .get(&provider_id)
-        .cloned()
-        .unwrap_or_default();
+    // From the system credential store, not from the settings file.
+    let api_key = crate::secrets::get_api_key(&provider_id).unwrap_or_default();
 
     // Only demand a key where one is actually needed to *list* models.
     //
@@ -1278,12 +1293,7 @@ pub async fn check_post_process_endpoint(
         });
     }
 
-    let api_key = settings
-        .post_process_api_keys
-        .get(&provider_id)
-        .cloned()
-        .unwrap_or_default();
-
+    let api_key = crate::secrets::get_api_key(&provider_id).unwrap_or_default();
     let owned_pid = crate::local_llm::owned_pid();
 
     Ok(
@@ -1316,11 +1326,7 @@ async fn endpoint_responds(settings: &settings::AppSettings, provider_id: &str) 
         return false;
     };
 
-    let api_key = settings
-        .post_process_api_keys
-        .get(provider_id)
-        .cloned()
-        .unwrap_or_default();
+    let api_key = crate::secrets::get_api_key(provider_id).unwrap_or_default();
 
     crate::llm_client::fetch_models(provider, api_key)
         .await

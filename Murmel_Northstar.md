@@ -230,18 +230,20 @@ größte Gewinn der Fork-Entscheidung:
 | **Zweiter Hotkey**      | `--toggle-post-process`       | Diktat _mit_ Nachbearbeitung, getrennt vom normalen Diktat                                           |
 | **Historie**            | `post_process_runs`           | Ein Eintrag je Veredelungslauf, auch für fehlgeschlagene (§9)                                        |
 
-> **Korrektur zu einer früheren Fassung dieses Dokuments:** Hier stand
-> „API-Keys verschlüsselt abgelegt". Das ist falsch. `SecretMap` verhindert
-> lediglich, dass Schlüssel in Logausgaben landen (`[REDACTED]` in der
-> `Debug`-Ausgabe) — gespeichert werden sie **im Klartext** in
-> `settings_store.json` im App-Data-Verzeichnis.
+> **API-Schlüssel liegen im Schlüsselbund des Betriebssystems** (Windows
+> Credential Manager, Secret Service unter Linux) — seit 0.15.0, siehe
+> `src-tauri/src/secrets.rs`. Bestehende Schlüssel werden beim ersten Start
+> einmalig dorthin verschoben und aus `settings_store.json` entfernt.
 >
-> Für ein Ein-Personen-Werkzeug auf dem eigenen Rechner ist das vertretbar: Wer
-> Zugriff auf dieses Verzeichnis hat, hat ohnehin Zugriff auf die Diktathistorie.
-> Es ist aber kein Schutz, auf den man sich berufen sollte. Echte Verschlüsselung
-> hieße, den Schlüsselbund des Betriebssystems zu nutzen (Windows DPAPI,
-> Secret Service auf Linux) — offen, falls jemals ein Cloud-Provider dauerhaft
-> im Einsatz ist.
+> Dass es so weit kam, hatte einen Grund: Hier stand lange „API-Keys
+> verschlüsselt abgelegt", während sie tatsächlich im Klartext in der
+> Einstellungsdatei lagen. `SecretMap` verhindert nur, dass Schlüssel in
+> Logausgaben auftauchen.
+>
+> Eigene Verschlüsselung wurde bewusst **nicht** gebaut: Der Schlüssel zum
+> Entschlüsseln müsste auch irgendwo liegen, das Problem wäre nur verschoben.
+> Ist kein Schlüsselbund erreichbar (Linux-Sitzung ohne laufenden Dienst),
+> meldet Murmel das — es fällt **nicht** stillschweigend auf eine Datei zurück.
 
 Ein Diktat kann also schon heute roh **oder** veredelt eingefügt werden — der
 Unterschied liegt nur am gedrückten Hotkey.
