@@ -638,11 +638,15 @@ es genau einmal.
 
 ### Irgendwann, vielleicht
 
+- [x] **Command Mode** — markierten Text per Sprache umschreiben lassen
+      („kürzer", „förmlicher"), dazu ein zweites Kürzel, das dieselbe
+      Markierung ohne Mikrofon durch ein Preset schickt. Das Datenmodell trug
+      es bereits: `post_process_runs` erlaubt mehrere Läufe je Eintrag, und
+      `input_text` hält fest, was das Modell tatsächlich bekam (§9). Dazu kam
+      eine `kind`-Spalte — solche Läufe erzeugen einen Eintrag wie ein Diktat,
+      sind aber keins, und „mach das kürzer" als Diktat gezählt verfälscht
+      Wörter pro Tag, Sprechtempo und Zeitersparnis zugleich
 - [ ] Sprachbefehle („Neuer Absatz", „Punkt", „Komma")
-- [ ] **Command Mode** — markierten Text per Sprache umschreiben lassen
-      („kürzer", „förmlicher"). Das Datenmodell trägt es bereits:
-      `post_process_runs` erlaubt mehrere Läufe je Diktat, und `input_text`
-      hält fest, was das Modell tatsächlich bekam (§9)
 - [ ] Onboarding eindampfen (§4.2 Schritt 1, letzter offener Punkt)
 
 ---
