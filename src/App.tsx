@@ -137,6 +137,31 @@ function App() {
     };
   }, [t]);
 
+  // Words learned from a correction captured in another window.
+  useEffect(() => {
+    const unlistenLearned = listen<string[]>("dictionary-learned", (event) => {
+      const words = event.payload;
+      if (words.length === 0) {
+        toast.info(t("dictionary.nothingNew"));
+        return;
+      }
+      toast.success(t("dictionary.learned", { count: words.length }), {
+        description: words.join(", "),
+      });
+    });
+
+    const unlistenError = listen<string>("dictionary-error", (event) => {
+      toast.error(t("dictionary.captureFailed"), {
+        description: event.payload,
+      });
+    });
+
+    return () => {
+      unlistenLearned.then((fn) => fn());
+      unlistenError.then((fn) => fn());
+    };
+  }, [t]);
+
   // Listen for paste failures and show a toast.
   // The technical error detail is logged to murmel.log on the Rust side
   // (see actions.rs `error!("Failed to paste transcription: ...")`),

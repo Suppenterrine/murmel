@@ -1015,6 +1015,71 @@ impl ShortcutAction for TestAction {
 }
 
 // Static Action Map
+/// Teach the dictionary from a correction made in the target application.
+///
+/// The user fixes a word wherever the text landed, selects the result and
+/// presses the key. Murmel copies the selection, compares it with the last
+/// dictation and adopts what is new.
+///
+/// The alternative — noticing corrections by itself — would mean reading
+/// foreign text fields continuously, in windows where passwords and messages
+/// are typed too. A deliberate keypress is the price for not doing that, and it
+/// doubles as the confirmation: unlike a correction made in the history, there
+/// is no ambiguity about whether the user meant to teach something.
+struct CaptureCorrectionAction;
+
+impl ShortcutAction for CaptureCorrectionAction {
+    fn start(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            match capture_correction(&app).await {
+                Ok(learned) if !learned.is_empty() => {
+                    log::info!("Learned {} word(s) from a correction", learned.len());
+                    let _ = app.emit("dictionary-learned", learned);
+                }
+                Ok(_) => {
+                    debug!("Correction captured, but nothing new to learn");
+                    let _ = app.emit("dictionary-learned", Vec::<String>::new());
+                }
+                Err(err) => {
+                    warn!("Could not capture correction: {err}");
+                    let _ = app.emit("dictionary-error", err);
+                }
+            }
+        });
+    }
+
+    fn stop(&self, _app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {}
+}
+
+async fn capture_correction(app: &AppHandle) -> Result<Vec<String>, String> {
+    let history = app.state::<Arc<HistoryManager>>();
+
+    let entry = history
+        .get_latest_completed_entry()
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| "There is no dictation to compare against yet.".to_string())?;
+
+    let selection = crate::clipboard::read_selection(app).await?;
+    if selection.trim().is_empty() {
+        return Err("Nothing was selected.".to_string());
+    }
+
+    let mut settings = get_settings(app);
+    let learned = crate::audio_toolkit::text::suggest_dictionary_entries(
+        &entry.transcription_text,
+        &selection,
+        &settings.custom_words,
+    );
+
+    if !learned.is_empty() {
+        settings.custom_words.extend(learned.iter().cloned());
+        crate::settings::write_settings(app, settings);
+    }
+
+    Ok(learned)
+}
+
 pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::new(|| {
     let mut map = HashMap::new();
     map.insert(
@@ -1030,6 +1095,10 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
     map.insert(
         "cancel".to_string(),
         Arc::new(CancelAction) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "capture_correction".to_string(),
+        Arc::new(CaptureCorrectionAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "test".to_string(),

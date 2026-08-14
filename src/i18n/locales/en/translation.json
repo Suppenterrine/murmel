@@ -17,6 +17,12 @@
     "refinement": "If you like, a second key tidies the text up as it goes: filler words out, punctuation in, phrased as an email or as notes. That too stays on this machine, as long as you use a language model running here.",
     "motto": "I murmur, therefore I am."
   },
+  "dictionary": {
+    "learned_one": "1 word added to the dictionary",
+    "learned_other": "{{count}} words added to the dictionary",
+    "nothingNew": "Nothing new — the dictionary already knows those words.",
+    "captureFailed": "Could not capture the correction"
+  },
   "sidebar": {
     "home": "Home",
     "insights": "Insights",

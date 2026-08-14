@@ -1015,6 +1015,21 @@ pub fn get_default_settings() -> AppSettings {
             current_binding: default_post_process_shortcut.to_string(),
         },
     );
+    // Teaching the dictionary from a correction made in another window. Not
+    // bound by default: it costs a global shortcut, and the same thing can be
+    // done from the history without one.
+    bindings.insert(
+        "capture_correction".to_string(),
+        ShortcutBinding {
+            id: "capture_correction".to_string(),
+            name: "Capture correction".to_string(),
+            description:
+                "Adds words from the selected text to the dictionary, compared against your last dictation."
+                    .to_string(),
+            default_binding: String::new(),
+            current_binding: String::new(),
+        },
+    );
     bindings.insert(
         "cancel".to_string(),
         ShortcutBinding {

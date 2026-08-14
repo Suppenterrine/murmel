@@ -32,6 +32,37 @@ pub fn get_cursor_position(app_handle: &AppHandle) -> Option<(i32, i32)> {
 /// handling the key need the modifier to still be down — the hold insures
 /// against those. Callers that can detect a failed chord (e.g. the
 /// receipt-sequenced paste path) may use a much shorter hold.
+/// Sends the platform's copy shortcut, to read what the user has selected in
+/// whatever window has focus.
+///
+/// Simulating the keystroke is the only portable way to get at a selection:
+/// asking the foreign window directly would mean speaking its accessibility
+/// protocol — reading other applications' contents, which is precisely what
+/// Murmel does not do.
+pub fn send_copy(enigo: &mut Enigo, hold_ms: u64) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    let (modifier_key, c_key_code) = (Key::Meta, Key::Other(8));
+    #[cfg(target_os = "windows")]
+    let (modifier_key, c_key_code) = (Key::Control, Key::Other(0x43)); // VK_C
+    #[cfg(target_os = "linux")]
+    let (modifier_key, c_key_code) = (Key::Control, Key::Unicode('c'));
+
+    enigo
+        .key(modifier_key, enigo::Direction::Press)
+        .map_err(|e| format!("Failed to press modifier key: {}", e))?;
+    enigo
+        .key(c_key_code, enigo::Direction::Click)
+        .map_err(|e| format!("Failed to click C key: {}", e))?;
+
+    std::thread::sleep(std::time::Duration::from_millis(hold_ms));
+
+    enigo
+        .key(modifier_key, enigo::Direction::Release)
+        .map_err(|e| format!("Failed to release modifier key: {}", e))?;
+
+    Ok(())
+}
+
 pub fn send_paste_ctrl_v(enigo: &mut Enigo, hold_ms: u64) -> Result<(), String> {
     // Platform-specific key definitions
     #[cfg(target_os = "macos")]

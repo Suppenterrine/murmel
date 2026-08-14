@@ -17,6 +17,12 @@
     "refinement": "Auf Wunsch räumt ein zweiter Tastendruck den Text gleich auf: Füllwörter raus, Interpunktion rein, auf Wunsch als E-Mail oder Notiz. Auch das geschieht lokal, sofern du ein Sprachmodell auf diesem Rechner nutzt.",
     "motto": "Ich murmle, also bin ich."
   },
+  "dictionary": {
+    "learned_one": "1 Wort ins Lexikon aufgenommen",
+    "learned_other": "{{count}} Wörter ins Lexikon aufgenommen",
+    "nothingNew": "Nichts Neues gefunden — das Lexikon kennt die Wörter schon.",
+    "captureFailed": "Korrektur konnte nicht übernommen werden"
+  },
   "sidebar": {
     "home": "Start",
     "insights": "Statistik",

@@ -51,6 +51,51 @@ fn finish_clipboard_paste(
     paste_result
 }
 
+/// Read whatever is selected in the focused window.
+///
+/// Works by borrowing the clipboard: save what is in it, send the copy
+/// shortcut, read the result, put the old contents back. Intrusive enough to
+/// justify saying why — there is no other portable way to see a selection
+/// without speaking accessibility protocols to foreign windows, which would
+/// mean reading their contents continuously rather than once on request.
+///
+/// The original clipboard is restored even when the copy fails, so an
+/// unsuccessful attempt leaves nothing behind.
+pub async fn read_selection(app_handle: &AppHandle) -> Result<String, String> {
+    let clipboard = app_handle.clipboard();
+    let saved = clipboard.read_text().ok().filter(|text| !text.is_empty());
+
+    // A marker: if the copy does not happen (nothing selected, or the window
+    // ignores the shortcut), the clipboard still holds this and the caller must
+    // not mistake stale contents for a selection.
+    const MARKER: &str = "\u{200B}murmel-selection-probe";
+    write_text_to_clipboard(app_handle, MARKER)?;
+
+    let copy_result = with_enigo(app_handle, |enigo| input::send_copy(enigo, 60));
+
+    // The target application needs a moment to service the keystroke.
+    tokio::time::sleep(Duration::from_millis(180)).await;
+
+    let selection = clipboard.read_text().ok();
+
+    // Restore before reporting anything, successful or not.
+    match saved {
+        Some(text) => {
+            let _ = write_text_to_clipboard(app_handle, &text);
+        }
+        None => {
+            let _ = app_handle.clipboard().clear();
+        }
+    }
+
+    copy_result?;
+
+    match selection {
+        Some(text) if text != MARKER => Ok(text),
+        _ => Err("No selection was copied.".to_string()),
+    }
+}
+
 /// Pastes text using the clipboard: saves current content, writes text, sends paste keystroke, restores clipboard.
 fn paste_via_clipboard(
     text: &str,
