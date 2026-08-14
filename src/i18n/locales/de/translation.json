@@ -503,7 +503,7 @@
     },
     "dictionary": {
       "title": "Lexikon",
-      "description": "Wörter, die Murmel richtig schreiben soll — Namen, Fachbegriffe, Produktnamen. Es genügt die richtige Schreibweise; ähnlich Klingendes wird von selbst darauf gezogen.",
+      "description": "Namen, Fachbegriffe, Produktnamen — alles, was Murmel regelmäßig anders schreibt, als du es meinst. Trage nur die richtige Schreibweise ein; was stattdessen ankam, muss nicht dabeistehen.",
       "empty": "Noch keine Einträge. Trage Wörter ein, die häufig falsch erkannt werden.",
       "add": "Hinzufügen",
       "addPlaceholder": "Wort oder Wortgruppe …",
@@ -513,7 +513,12 @@
       "noMatches": "Kein Eintrag gefunden.",
       "remove": "Eintrag entfernen",
       "entryLabel": "Eintrag {{word}}",
-      "hint": "Mehrere Wörter sind erlaubt: „Charge B\" wird so zu „ChargeBee\". Ein leerer Eintrag wird beim Speichern entfernt."
+      "hint": "Ein leerer Eintrag wird beim Speichern entfernt.",
+      "howTitle": "Wie das Lexikon wirkt",
+      "howBefore": "Murmel gibt dem Sprachmodell die Liste mit, bevor es zuhört. Es rechnet dann mit diesen Wörtern und schreibt sie eher von sich aus richtig.",
+      "howAfter": "Kommt trotzdem etwas anderes heraus, vergleicht Murmel jedes Wort im Ergebnis mit deinen Einträgen — nach Schreibweise und nach Klang. Liegt es nah genug, wird es ersetzt. Deshalb genügt der richtige Eintrag: die falschen Varianten musst du nicht sammeln.",
+      "howPhrases": "Eine Wortgruppe ist ein Eintrag mit Leerzeichen, etwa „Silly Tavern\". Murmel betrachtet beim Vergleich bis zu drei aufeinanderfolgende Wörter am Stück — so wird aus „Charge B\" ein „ChargeBee\", und Wörter, die beim Diktieren auseinandergerissen wurden, finden wieder zusammen.",
+      "howLimits": "Der Klangvergleich arbeitet nach englischen Ausspracheregeln und greift nur bei Einträgen ohne Umlaute und ß. Für die Whisper-Modelle spielt das keine Rolle — dort wirkt der erste Weg."
     },
     "insights": {
       "title": "Statistik",

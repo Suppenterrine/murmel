@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { ChevronRight, Plus, Search, Trash2 } from "lucide-react";
 import { useSettings } from "../../../hooks/useSettings";
 import { Button } from "../../ui/Button";
 import { Input } from "../../ui/Input";
@@ -170,6 +170,25 @@ export const DictionarySettings: React.FC = () => {
       )}
 
       <p className="text-xs text-text/50">{t("settings.dictionary.hint")}</p>
+
+      {/*
+       * Folded away rather than printed above the list: it answers questions
+       * ("do I have to enter the misheard version too?") that only come up once,
+       * and a permanent wall of explanation over a five-line list gets the
+       * weighting backwards.
+       */}
+      <details className="group border-t border-mid-gray/20 pt-3">
+        <summary className="text-xs text-text/50 hover:text-text/80 cursor-pointer list-none flex items-center gap-1.5 transition-colors">
+          <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" />
+          {t("settings.dictionary.howTitle")}
+        </summary>
+        <div className="mt-3 space-y-2 text-xs text-text/60 leading-relaxed ps-5">
+          <p>{t("settings.dictionary.howBefore")}</p>
+          <p>{t("settings.dictionary.howAfter")}</p>
+          <p>{t("settings.dictionary.howPhrases")}</p>
+          <p className="text-text/45">{t("settings.dictionary.howLimits")}</p>
+        </div>
+      </details>
     </div>
   );
 };
