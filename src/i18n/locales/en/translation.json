@@ -197,6 +197,10 @@
             "name": "Post-Processing Hotkey",
             "description": "Optional: A dedicated hotkey that always applies AI post-processing to your transcription."
           },
+          "command_mode": {
+            "name": "Command Mode",
+            "description": "Select text, hold this key and say what should happen to it — \"make this shorter\", \"more formal\". On release Murmel replaces the selection with the result."
+          },
           "rewrite_selection": {
             "name": "Rewrite selection",
             "description": "Select text in any window and press this key. Murmel runs it through the chosen instruction and replaces it with the result. Undo in the target application puts the original back."
@@ -552,6 +556,8 @@
       "ofDictations": "{{count}} of {{total}}",
       "failures": "({{count}} failed)",
       "modelSummary": "{{count}}× · avg {{seconds}} s",
+      "rewriteSummary": "{{count}}×",
+      "spokenCommands": "{{count}} of them spoken",
       "details": {
         "title": "In detail",
         "pace": "Speaking pace",
@@ -560,6 +566,8 @@
         "busiestHourDescription": "The hour you dictate in most often.",
         "refined": "Refined",
         "refinedDescription": "How many dictations went through a language model.",
+        "rewrites": "Rewritten",
+        "rewritesDescription": "Selected text that was rewritten rather than dictated. Counted in none of the figures above — those all describe dictating.",
         "modelDescription": "Dictations and average recognition time."
       },
       "data": {
@@ -836,7 +844,9 @@
   },
   "overlay": {
     "transcribing": "Transcribing …",
-    "processing": "Refining …"
+    "processing": "Refining …",
+    "rewriting": "Rewriting …",
+    "instruction": "Instruction"
   },
   "secureInput": {
     "blockedWithCulprit_one": "{{name}} may be blocking 1 shortcut",

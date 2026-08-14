@@ -1134,6 +1134,7 @@ rewrites: number;
  * Of those, the ones steered by a spoken instruction (Command Mode).
  */
 spoken_commands: number }
+
 /**
  * One statistics row, for export.
  */

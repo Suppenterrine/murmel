@@ -1034,6 +1034,23 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
     #[cfg(target_os = "macos")]
+    let default_command_shortcut = "option+shift+c";
+    #[cfg(not(target_os = "macos"))]
+    let default_command_shortcut = "ctrl+alt+space";
+
+    // Speaking an instruction over a selection.
+    bindings.insert(
+        "command_mode".to_string(),
+        ShortcutBinding {
+            id: "command_mode".to_string(),
+            name: "Command Mode".to_string(),
+            description: "Hold, say what should happen to the selected text, release.".to_string(),
+            default_binding: default_command_shortcut.to_string(),
+            current_binding: default_command_shortcut.to_string(),
+        },
+    );
+
+    #[cfg(target_os = "macos")]
     let default_rewrite_shortcut = "option+shift+r";
     #[cfg(not(target_os = "macos"))]
     let default_rewrite_shortcut = "ctrl+alt+r";

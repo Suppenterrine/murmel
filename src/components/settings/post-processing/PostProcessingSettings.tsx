@@ -449,6 +449,15 @@ const RewriteSettingsComponent: React.FC = () => {
         grouped={true}
       />
 
+      {/* Command Mode sits here rather than under the dictation hotkey: it acts
+          on a selection, like the key above, and shares its provider and model.
+          It has no prompt setting — the instruction is spoken. */}
+      <ShortcutInput
+        shortcutId="command_mode"
+        descriptionMode="tooltip"
+        grouped={true}
+      />
+
       <SettingContainer
         title={t("settings.postProcessing.rewrite.prompt.title")}
         description={t("settings.postProcessing.rewrite.prompt.description")}

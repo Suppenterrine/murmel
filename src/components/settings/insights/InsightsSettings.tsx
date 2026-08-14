@@ -215,6 +215,30 @@ export const InsightsSettings: React.FC = () => {
               </span>
             </SettingContainer>
 
+            {/* Counted apart from every figure above, which all describe
+                dictating. Shown only once it has happened — a permanent "0"
+                would advertise a feature rather than report usage. */}
+            {summary.rewrites > 0 && (
+              <SettingContainer
+                title={t("settings.insights.details.rewrites")}
+                description={t("settings.insights.details.rewritesDescription")}
+                grouped
+              >
+                <span className="text-sm font-mono">
+                  {t("settings.insights.rewriteSummary", {
+                    count: summary.rewrites,
+                  })}
+                  {summary.spoken_commands > 0 && (
+                    <span className="ms-2 text-text/50">
+                      {t("settings.insights.spokenCommands", {
+                        count: summary.spoken_commands,
+                      })}
+                    </span>
+                  )}
+                </span>
+              </SettingContainer>
+            )}
+
             {summary.models.map((model) => (
               <SettingContainer
                 key={model.model}

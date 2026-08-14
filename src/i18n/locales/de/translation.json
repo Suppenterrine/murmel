@@ -228,6 +228,10 @@
             "name": "Nachbearbeitungs-Tastenkürzel",
             "description": "Optional: Ein dediziertes Tastenkürzel, das immer die KI-Nachbearbeitung auf deine Transkription anwendet."
           },
+          "command_mode": {
+            "name": "Befehlsmodus",
+            "description": "Markiere Text, halte diese Taste und sag, was mit ihm geschehen soll — „mach das kürzer“, „förmlicher“. Beim Loslassen ersetzt Murmel die Markierung durch das Ergebnis."
+          },
           "rewrite_selection": {
             "name": "Markierung umschreiben",
             "description": "Markiere Text in einem beliebigen Fenster und drücke diese Taste. Murmel schickt ihn durch die gewählte Anweisung und ersetzt ihn durch das Ergebnis. Rückgängig geht im Zielprogramm mit Strg+Z."
@@ -552,6 +556,8 @@
       "ofDictations": "{{count}} von {{total}}",
       "failures": "({{count}} fehlgeschlagen)",
       "modelSummary": "{{count}}× · ⌀ {{seconds}} s",
+      "rewriteSummary": "{{count}}×",
+      "spokenCommands": "davon {{count}} gesprochen",
       "details": {
         "title": "Im Einzelnen",
         "pace": "Sprechtempo",
@@ -560,6 +566,8 @@
         "busiestHourDescription": "Die Stunde, in der du am häufigsten diktierst.",
         "refined": "Nachbearbeitet",
         "refinedDescription": "Wie viele Diktate durch ein Sprachmodell gelaufen sind.",
+        "rewrites": "Umgeschrieben",
+        "rewritesDescription": "Markierter Text, der umgeschrieben statt diktiert wurde. Zählt in keiner der Zahlen oben mit — die beschreiben alle das Diktieren.",
         "modelDescription": "Diktate und durchschnittliche Erkennungszeit."
       },
       "data": {
@@ -833,7 +841,9 @@
   },
   "overlay": {
     "transcribing": "Transkribiere …",
-    "processing": "Veredele …"
+    "processing": "Veredele …",
+    "rewriting": "Schreibe um …",
+    "instruction": "Anweisung"
   },
   "whatsNew": {
     "title": "Neu in Murmel v{{version}}"

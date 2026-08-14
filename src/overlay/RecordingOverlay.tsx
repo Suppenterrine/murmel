@@ -14,6 +14,9 @@ import { getLanguageDirection } from "@/lib/utils/rtl";
 
 type OverlayState = "recording" | "streaming" | "transcribing" | "processing";
 
+/** What this dictation is for — see `overlay.rs`. */
+type DictationIntent = "plain" | "refined" | "command";
+
 // Number of reactive bars in the waveform (the simple, smoothed style shared by
 // every overlay form). Mic levels arrive as 16 FFT buckets; we take the first N.
 const WAVE_BARS = 9;
@@ -26,6 +29,10 @@ const RecordingOverlay: React.FC = () => {
   // hotkeys look identical while speaking otherwise, and the difference only
   // becomes visible at the very end — or never, if nothing is configured.
   const [postProcess, setPostProcess] = useState(false);
+  // Command Mode needs its own label rather than the refinement sparkle: what
+  // is being spoken there is an *instruction*, and a user who thinks they are
+  // dictating text gets a paragraph replaced by their own sentence.
+  const [intent, setIntent] = useState<DictationIntent>("plain");
   const [levels, setLevels] = useState<number[]>(Array(WAVE_BARS).fill(0));
   const [streamText, setStreamText] = useState<StreamTextEvent>({
     committed: "",
@@ -71,10 +78,12 @@ const RecordingOverlay: React.FC = () => {
         const payload = event.payload as {
           state: OverlayState;
           post_process: boolean;
+          intent?: DictationIntent;
         };
         const overlayState = payload.state;
         setState(overlayState);
         setPostProcess(payload.post_process);
+        setIntent(payload.intent ?? "plain");
         if (overlayState === "recording" || overlayState === "streaming") {
           setStreamText({ committed: "", tentative: "" });
         }
@@ -200,7 +209,14 @@ const RecordingOverlay: React.FC = () => {
         {/* Sits beside the dot so the difference between the two dictation
             hotkeys is visible while speaking, not only once the text arrives.
             Same symbol the sidebar uses for refinement. */}
-        {postProcess && (
+        {/* Command Mode says so in words. The sparkle means "this will be
+            polished afterwards"; here the point is that what you are about to
+            say is an instruction and not the text itself — that cannot be
+            carried by an icon. */}
+        {intent === "command" && (
+          <span className="sintent">{t("overlay.instruction")}</span>
+        )}
+        {postProcess && intent !== "command" && (
           <svg
             className="spolish"
             viewBox="0 0 24 24"
@@ -293,7 +309,9 @@ const RecordingOverlay: React.FC = () => {
   const working = state === "transcribing" || state === "processing";
   const workLabel =
     state === "processing"
-      ? t("overlay.processing")
+      ? intent === "command"
+        ? t("overlay.rewriting")
+        : t("overlay.processing")
       : t("overlay.transcribing");
 
   return (

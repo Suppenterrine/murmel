@@ -321,6 +321,19 @@
   color: var(--s-accent);
   opacity: 0.75;
 }
+/* Command Mode's label. Same restraint as the sparkle above, but it has to be
+   readable: the whole point is that the user knows they are dictating an
+   instruction before they start speaking. */
+.sintent {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--s-accent);
+  opacity: 0.85;
+  white-space: nowrap;
+}
 .sbase-r {
   display: flex;
   align-items: center;

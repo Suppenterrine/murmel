@@ -254,7 +254,10 @@ pub fn suspend_all_shortcuts(app: &AppHandle) {
 /// while it covered one binding — with a second one, the fourth copy is the one
 /// that gets forgotten and the key then fires into nothing.
 pub(crate) fn is_inert(id: &str, settings: &crate::settings::AppSettings) -> bool {
-    let needs_language_model = matches!(id, "transcribe_with_post_process" | "rewrite_selection");
+    let needs_language_model = matches!(
+        id,
+        "transcribe_with_post_process" | "rewrite_selection" | "command_mode"
+    );
     needs_language_model && !settings.post_process_enabled
 }
 

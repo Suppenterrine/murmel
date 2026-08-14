@@ -2,6 +2,7 @@ use crate::input;
 use crate::settings;
 use crate::settings::{OverlayPosition, OverlayStyle};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 
@@ -478,25 +479,57 @@ pub fn create_recording_overlay(app_handle: &AppHandle) {
     }
 }
 
-/// Whether the dictation currently on screen was started with refinement.
+/// What the dictation currently on screen is for.
 ///
-/// Held here rather than passed through every call site: the flag is decided
+/// It matters *while speaking*: the hotkeys are otherwise indistinguishable,
+/// and finding out at the end — or not at all, when nothing is configured — is
+/// exactly the confusion this removes. Command Mode makes that sharper still,
+/// because there the user has to know they are dictating an *instruction* and
+/// not text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DictationIntent {
+    Plain,
+    Refined,
+    Command,
+}
+
+impl DictationIntent {
+    fn as_str(self) -> &'static str {
+        match self {
+            DictationIntent::Plain => "plain",
+            DictationIntent::Refined => "refined",
+            DictationIntent::Command => "command",
+        }
+    }
+}
+
+/// Held here rather than passed through every call site: the intent is decided
 /// once when recording starts and has to survive until the last overlay update
-/// of that dictation. It matters *while speaking* — the two hotkeys are
-/// otherwise indistinguishable, and finding out only at the end (or not at all,
-/// when nothing is configured) is exactly the confusion this removes.
-static POST_PROCESS_ACTIVE: AtomicBool = AtomicBool::new(false);
+/// of that dictation.
+static DICTATION_INTENT: Mutex<DictationIntent> = Mutex::new(DictationIntent::Plain);
 
 /// Called when a dictation starts, with whichever hotkey triggered it.
-pub fn set_post_process_active(active: bool) {
-    POST_PROCESS_ACTIVE.store(active, Ordering::Relaxed);
+pub fn set_dictation_intent(intent: DictationIntent) {
+    if let Ok(mut current) = DICTATION_INTENT.lock() {
+        *current = intent;
+    }
+}
+
+fn current_intent() -> DictationIntent {
+    DICTATION_INTENT
+        .lock()
+        .map(|intent| *intent)
+        .unwrap_or(DictationIntent::Plain)
 }
 
 /// What the overlay window is told on every state change.
 #[derive(Clone, serde::Serialize)]
 struct OverlayStatePayload<'a> {
     state: &'a str,
+    /// Kept for the working states, which only need to know whether a second
+    /// step follows the transcription.
     post_process: bool,
+    intent: &'a str,
 }
 
 fn show_overlay_state(app_handle: &AppHandle, state: &str) {
@@ -599,11 +632,13 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
             );
         }
 
+        let intent = current_intent();
         let _ = overlay_window.emit(
             "show-overlay",
             OverlayStatePayload {
                 state,
-                post_process: POST_PROCESS_ACTIVE.load(Ordering::Relaxed),
+                post_process: intent != DictationIntent::Plain,
+                intent: intent.as_str(),
             },
         );
     }
