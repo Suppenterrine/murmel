@@ -97,16 +97,6 @@ impl DictationMode {
     }
 }
 
-/// The text Command Mode is about to act on, read when the key went down.
-///
-/// Read at the *start* of the dictation rather than at the end: by the time the
-/// user has finished speaking, the instruction has already been given, and
-/// discovering then that nothing was selected wastes the whole sentence. Held
-/// here for the same reason the overlay holds its flag — the value is decided in
-/// `start` and needed in `stop`, and threading it through the recording manager
-/// would put text into a component that deals in audio.
-static PENDING_SELECTION: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
-
 // Transcribe Action
 struct TranscribeAction {
     mode: DictationMode,
@@ -590,32 +580,48 @@ async fn produce_output(
     let settings = get_settings(app);
     let effective_language = resolve_effective_language(app, &settings);
 
-    // Taken, not copied: the selection belongs to this dictation, and leaving it
-    // behind would let the next Command Mode press act on stale text if its own
-    // capture failed.
-    let selection = PENDING_SELECTION
-        .lock()
-        .ok()
-        .and_then(|mut held| held.take());
-
-    let Some(selection) = selection else {
-        // The capture in `start` already cancelled the recording and told the
-        // user. Reaching here means it lost the race; pasting the instruction
-        // as if it were dictation would be worse than doing nothing.
-        warn!("Command Mode finished without a selection to act on");
-        return ProcessedTranscription {
-            final_text: String::new(),
-            post_process: Vec::new(),
-            effective_language,
-        };
+    // Read *after* the key is up, not while it is held.
+    //
+    // Reading it up front would be friendlier — you would learn that nothing was
+    // selected before speaking a whole sentence into it. But copying means
+    // releasing the modifiers first (see `input::send_copy`), and a synthetic
+    // release while the hotkey is still down reads as "key let go": the
+    // recording ended a quarter-second in, the model got near-silence, and its
+    // answer replaced the selection. Correct beats early.
+    let selection = match crate::clipboard::read_selection(app).await {
+        Ok(text) if !text.trim().is_empty() => text,
+        outcome => {
+            let reason = match outcome {
+                Err(err) => err,
+                _ => "Nothing was selected.".to_string(),
+            };
+            warn!("Command Mode has nothing to work on: {reason}");
+            let _ = app.emit("rewrite-error", reason);
+            return ProcessedTranscription {
+                final_text: String::new(),
+                post_process: Vec::new(),
+                effective_language,
+            };
+        }
     };
 
     let (rewritten, runs) = process_command_output(app, transcription, &selection).await;
 
+    // Whitespace counts as nothing. A small local model answering with a single
+    // space would otherwise sail past the emptiness check downstream and replace
+    // the selection with it — which is how a paragraph turns into a blank.
+    let final_text = rewritten
+        .filter(|text| !text.trim().is_empty())
+        .unwrap_or_default();
+
+    if final_text.is_empty() {
+        warn!("Command Mode produced no usable text; leaving the selection alone");
+    }
+
     ProcessedTranscription {
-        // No result means the selection stays as it was. Replacing it with
+        // Nothing usable means the selection stays as it was. Replacing it with
         // nothing would delete the text the user asked to have improved.
-        final_text: rewritten.unwrap_or_default(),
+        final_text,
         post_process: runs,
         effective_language,
     }
@@ -750,44 +756,6 @@ fn build_llm_run(
     }
 }
 
-/// Grab the selection while the user begins to speak.
-///
-/// Alongside the recording rather than before it: reading the selection borrows
-/// the clipboard and waits on the target application, which takes long enough
-/// that doing it first would swallow the start of the sentence.
-///
-/// Nothing selected means the dictation is pointless, so it is stopped at once
-/// — the user finds out while they still remember pressing the key, instead of
-/// after a sentence spoken into nothing.
-fn capture_pending_selection(app: &AppHandle) {
-    if let Ok(mut pending) = PENDING_SELECTION.lock() {
-        *pending = None;
-    }
-
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let selection = crate::clipboard::read_selection(&app).await;
-
-        match selection {
-            Ok(text) if !text.trim().is_empty() => {
-                debug!("Command Mode captured {} characters", text.len());
-                if let Ok(mut pending) = PENDING_SELECTION.lock() {
-                    *pending = Some(text);
-                }
-            }
-            outcome => {
-                let reason = match outcome {
-                    Err(err) => err,
-                    _ => "Nothing was selected.".to_string(),
-                };
-                warn!("Command Mode has nothing to work on: {reason}");
-                utils::cancel_current_operation(&app);
-                let _ = app.emit("rewrite-error", reason);
-            }
-        }
-    });
-}
-
 impl ShortcutAction for TranscribeAction {
     fn start(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
         let start_time = Instant::now();
@@ -912,10 +880,6 @@ impl ShortcutAction for TranscribeAction {
         if recording_error.is_none() {
             // Dynamically register the cancel shortcut in a separate task to avoid deadlock
             shortcut::register_cancel_shortcut(app);
-
-            if self.mode == DictationMode::Command {
-                capture_pending_selection(app);
-            }
         } else {
             // Starting failed (for example due to blocked microphone permissions).
             // Revert UI state so we don't stay stuck in the recording overlay.
