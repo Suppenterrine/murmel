@@ -1,6 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
+  BookMarked,
   ChartColumn,
   Cog,
   Cpu,
@@ -19,6 +20,7 @@ import {
   AdvancedSettings,
   HistorySettings,
   InsightsSettings,
+  DictionarySettings,
   DebugSettings,
   AboutSettings,
   PostProcessingSettings,
@@ -67,6 +69,12 @@ export const SECTIONS_CONFIG = {
     labelKey: "sidebar.insights",
     icon: ChartColumn,
     component: InsightsSettings,
+    enabled: () => true,
+  },
+  dictionary: {
+    labelKey: "sidebar.dictionary",
+    icon: BookMarked,
+    component: DictionarySettings,
     enabled: () => true,
   },
   models: {

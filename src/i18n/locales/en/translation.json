@@ -20,6 +20,7 @@
   "sidebar": {
     "home": "Home",
     "insights": "Insights",
+    "dictionary": "Dictionary",
     "general": "General",
     "models": "Models",
     "advanced": "Advanced",
@@ -487,6 +488,20 @@
         "selectToEdit": "Select a prompt above to view and edit its details.",
         "createFirst": "Click 'Create New Prompt' above to create your first post-processing prompt."
       }
+    },
+    "dictionary": {
+      "title": "Dictionary",
+      "description": "Words Murmel should spell correctly — names, technical terms, product names. The correct spelling is enough; anything that sounds close is drawn to it automatically.",
+      "empty": "No entries yet. Add words that are frequently misrecognised.",
+      "add": "Add",
+      "addPlaceholder": "Word or phrase…",
+      "save": "Save",
+      "saved": "Saved",
+      "searchPlaceholder": "Search dictionary…",
+      "noMatches": "No entry found.",
+      "remove": "Remove entry",
+      "entryLabel": "Entry {{word}}",
+      "hint": "Several words are allowed: \"Charge B\" becomes \"ChargeBee\". An empty entry is dropped when saving."
     },
     "insights": {
       "title": "Insights",

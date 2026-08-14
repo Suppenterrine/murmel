@@ -20,6 +20,7 @@
   "sidebar": {
     "home": "Start",
     "insights": "Statistik",
+    "dictionary": "Lexikon",
     "general": "Allgemein",
     "models": "Modelle",
     "advanced": "Erweitert",
@@ -487,6 +488,20 @@
         "selectToEdit": "Wähle oben einen Prompt aus, um dessen Details anzuzeigen und zu bearbeiten.",
         "createFirst": "Klicke oben auf 'Neuen Prompt erstellen', um deinen ersten Nachbearbeitungs-Prompt zu erstellen."
       }
+    },
+    "dictionary": {
+      "title": "Lexikon",
+      "description": "Wörter, die Murmel richtig schreiben soll — Namen, Fachbegriffe, Produktnamen. Es genügt die richtige Schreibweise; ähnlich Klingendes wird von selbst darauf gezogen.",
+      "empty": "Noch keine Einträge. Trage Wörter ein, die häufig falsch erkannt werden.",
+      "add": "Hinzufügen",
+      "addPlaceholder": "Wort oder Wortgruppe …",
+      "save": "Speichern",
+      "saved": "Gespeichert",
+      "searchPlaceholder": "Lexikon durchsuchen …",
+      "noMatches": "Kein Eintrag gefunden.",
+      "remove": "Eintrag entfernen",
+      "entryLabel": "Eintrag {{word}}",
+      "hint": "Mehrere Wörter sind erlaubt: „Charge B\" wird so zu „ChargeBee\". Ein leerer Eintrag wird beim Speichern entfernt."
     },
     "insights": {
       "title": "Statistik",
