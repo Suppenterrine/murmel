@@ -1,6 +1,8 @@
 use crate::actions::process_transcription_output;
 use crate::managers::{
-    history::{HistoryEntry, HistoryManager, PaginatedHistory, TranscriptionUpdate},
+    history::{
+        HistoryEntry, HistoryManager, PaginatedHistory, TranscriptionUpdate, UsageRow, UsageSummary,
+    },
     transcription::TranscriptionManager,
 };
 use std::sync::Arc;
@@ -38,6 +40,47 @@ pub async fn search_history_entries(
     history_manager
         .search_history_entries(query, only_saved, limit)
         .await
+        .map_err(|e| e.to_string())
+}
+
+/// Typing speed the time-saved estimate is measured against.
+///
+/// 40 words per minute is a common figure for someone typing prose they are
+/// composing as they go — not a touch-typist copying text, which is the number
+/// usually quoted and would flatter the comparison. Murmel_Northstar.md §6.1.
+const TYPING_WPM: f64 = 40.0;
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_usage_summary(
+    _app: AppHandle,
+    history_manager: State<'_, Arc<HistoryManager>>,
+) -> Result<UsageSummary, String> {
+    history_manager
+        .usage_summary(TYPING_WPM)
+        .map_err(|e| e.to_string())
+}
+
+/// All statistics rows, for the user to take with them.
+#[tauri::command]
+#[specta::specta]
+pub async fn export_usage_stats(
+    _app: AppHandle,
+    history_manager: State<'_, Arc<HistoryManager>>,
+) -> Result<Vec<UsageRow>, String> {
+    history_manager.usage_rows().map_err(|e| e.to_string())
+}
+
+/// Erase the statistics without touching the history.
+#[tauri::command]
+#[specta::specta]
+pub async fn clear_usage_stats(
+    _app: AppHandle,
+    history_manager: State<'_, Arc<HistoryManager>>,
+) -> Result<(), String> {
+    history_manager
+        .clear_usage_stats()
+        .map(|_| ())
         .map_err(|e| e.to_string())
 }
 

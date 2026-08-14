@@ -19,6 +19,7 @@
   },
   "sidebar": {
     "home": "Start",
+    "insights": "Statistik",
     "general": "Allgemein",
     "models": "Modelle",
     "advanced": "Erweitert",
@@ -486,6 +487,44 @@
         "selectToEdit": "Wähle oben einen Prompt aus, um dessen Details anzuzeigen und zu bearbeiten.",
         "createFirst": "Klicke oben auf 'Neuen Prompt erstellen', um deinen ersten Nachbearbeitungs-Prompt zu erstellen."
       }
+    },
+    "insights": {
+      "title": "Statistik",
+      "description": "Was beim Diktieren ohnehin anfällt — hier zusammengezählt. Nichts davon verlässt diesen Rechner, und der Diktattext selbst wird dafür nirgends gespeichert.",
+      "empty": "Noch keine Daten. Sobald du diktierst, sammeln sich die Zahlen hier an.",
+      "dictations": "Diktate",
+      "words": "Wörter",
+      "spoken": "Gesprochen",
+      "saved": "Gespart",
+      "perDay": "Wörter pro Tag",
+      "dayTooltip": "{{day}}: {{words}} Wörter",
+      "minutes": "{{minutes}} min",
+      "hoursMinutes": "{{hours}} h {{minutes}} min",
+      "wpm": "{{wpm}} Wörter/Min",
+      "hourRange": "{{from}}–{{to}} Uhr",
+      "ofDictations": "{{count}} von {{total}}",
+      "failures": "({{count}} fehlgeschlagen)",
+      "modelSummary": "{{count}}× · ⌀ {{seconds}} s",
+      "details": {
+        "title": "Im Einzelnen",
+        "pace": "Sprechtempo",
+        "paceDescription": "Wörter pro Minute, über alle Diktate gerechnet.",
+        "busiestHour": "Aktivste Zeit",
+        "busiestHourDescription": "Die Stunde, in der du am häufigsten diktierst.",
+        "refined": "Nachbearbeitet",
+        "refinedDescription": "Wie viele Diktate durch ein Sprachmodell gelaufen sind.",
+        "modelDescription": "Diktate und durchschnittliche Erkennungszeit."
+      },
+      "data": {
+        "title": "Deine Daten",
+        "export": "Exportieren",
+        "exportDescription": "Alle Zahlen als Datei — zum Mitnehmen oder Auswerten.",
+        "clear": "Statistik zurücksetzen",
+        "clearDescription": "Löscht alle Zahlen. Dein Verlauf mit den Transkripten bleibt davon unberührt.",
+        "clearButton": "Zurücksetzen"
+      },
+      "clearTitle": "Statistik zurücksetzen",
+      "clearConfirm": "Alle Nutzungszahlen löschen? Der Verlauf mit deinen Transkripten bleibt erhalten. Das lässt sich nicht rückgängig machen."
     },
     "history": {
       "title": "Verlauf",

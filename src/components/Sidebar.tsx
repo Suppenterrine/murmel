@@ -1,6 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ChartColumn,
   Cog,
   Cpu,
   FlaskConical,
@@ -17,6 +18,7 @@ import {
   GeneralSettings,
   AdvancedSettings,
   HistorySettings,
+  InsightsSettings,
   DebugSettings,
   AboutSettings,
   PostProcessingSettings,
@@ -59,6 +61,12 @@ export const SECTIONS_CONFIG = {
     labelKey: "sidebar.history",
     icon: History,
     component: HistorySettings,
+    enabled: () => true,
+  },
+  insights: {
+    labelKey: "sidebar.insights",
+    icon: ChartColumn,
+    component: InsightsSettings,
     enabled: () => true,
   },
   models: {

@@ -272,6 +272,30 @@ async searchHistoryEntries(query: string | null, onlySaved: boolean, limit: numb
     else return { status: "error", error: e  as any };
 }
 },
+async getUsageSummary() : Promise<Result<UsageSummary, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_usage_summary") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async exportUsageStats() : Promise<Result<UsageRow[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_usage_stats") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async clearUsageStats() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("clear_usage_stats") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async hasPostProcessApiKey(providerId: string) : Promise<Result<boolean, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("has_post_process_api_key", { providerId }) };
@@ -1073,6 +1097,22 @@ error: string | null;
  */
 owned_pid: number | null }
 export type GpuDeviceOption = { id: number; name: string; total_vram_mb: number }
+/**
+ * Words dictated on one calendar day, local time.
+ */
+export type DailyWords = { day: string; words: number }
+/**
+ * How much a given model was used, and how fast it was.
+ */
+export type ModelUsage = { model: string; dictations: number; average_processing_ms: number }
+/**
+ * The numbers behind the Insights view.
+ */
+export type UsageSummary = { dictations: number; words: number; duration_ms: number; processing_ms: number; refined: number; refinement_failures: number; saved_ms: number; busiest_hour: number | null; per_day: DailyWords[]; models: ModelUsage[] }
+/**
+ * One statistics row, for export.
+ */
+export type UsageRow = { timestamp: number; duration_ms: number | null; word_count: number | null; processing_ms: number | null; model_used: string | null; language: string | null; post_process_requested: boolean; post_process_provider: string | null; post_process_model: string | null; post_process_ms: number | null; post_process_succeeded: boolean | null }
 /**
  * A model installed in Ollama.
  */

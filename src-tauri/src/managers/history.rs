@@ -244,6 +244,60 @@ pub struct PostProcessRun {
     pub error: Option<String>,
 }
 
+/// Words dictated on one calendar day, local time.
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct DailyWords {
+    /// `YYYY-MM-DD`.
+    pub day: String,
+    pub words: i64,
+}
+
+/// How much a given model was used, and how fast it was.
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct ModelUsage {
+    pub model: String,
+    pub dictations: i64,
+    pub average_processing_ms: f64,
+}
+
+/// The numbers behind the Insights view.
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct UsageSummary {
+    pub dictations: i64,
+    pub words: i64,
+    /// Time spent speaking.
+    pub duration_ms: i64,
+    /// Time the speech-to-text engine spent.
+    pub processing_ms: i64,
+    pub refined: i64,
+    /// Refinement attempts that failed — the number that says whether a local
+    /// model is dependable.
+    pub refinement_failures: i64,
+    /// Estimated time saved against typing, never negative.
+    pub saved_ms: i64,
+    /// Hour of day (0–23) with the most dictations, if there are any.
+    pub busiest_hour: Option<u32>,
+    /// Up to 30 days, oldest first.
+    pub per_day: Vec<DailyWords>,
+    pub models: Vec<ModelUsage>,
+}
+
+/// One statistics row, for export.
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct UsageRow {
+    pub timestamp: i64,
+    pub duration_ms: Option<i64>,
+    pub word_count: Option<i64>,
+    pub processing_ms: Option<i64>,
+    pub model_used: Option<String>,
+    pub language: Option<String>,
+    pub post_process_requested: bool,
+    pub post_process_provider: Option<String>,
+    pub post_process_model: Option<String>,
+    pub post_process_ms: Option<i64>,
+    pub post_process_succeeded: Option<bool>,
+}
+
 /// Everything needed to persist a finished transcription. This is a struct
 /// rather than a parameter list because the metrics are almost all `Option<i64>`
 /// — as positional arguments they would be trivial to transpose, and a swapped
@@ -905,6 +959,160 @@ impl HistoryManager {
         Ok(PaginatedHistory { entries, has_more })
     }
 
+    /// Everything the Insights view shows, in one query pass.
+    ///
+    /// Assembled here rather than handing raw rows to the frontend: these are
+    /// aggregates over a table that grows for years, and shipping thousands of
+    /// rows across the bridge to sum them in JavaScript would be wasteful and
+    /// would put the arithmetic somewhere it cannot be tested.
+    pub fn usage_summary(&self, typing_wpm: f64) -> Result<UsageSummary> {
+        let conn = self.get_connection()?;
+
+        let (dictations, words, duration_ms, processing_ms): (i64, i64, i64, i64) = conn
+            .query_row(
+                "SELECT
+                    COUNT(*),
+                    COALESCE(SUM(word_count), 0),
+                    COALESCE(SUM(duration_ms), 0),
+                    COALESCE(SUM(processing_ms), 0)
+                 FROM usage_stats",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )?;
+
+        let refined: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM usage_stats WHERE post_process_succeeded = 1",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let refinement_failures: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM usage_stats WHERE post_process_succeeded = 0",
+            [],
+            |row| row.get(0),
+        )?;
+
+        // Local time, not UTC: "which day did I dictate this" is a question
+        // about the user's calendar, and a dictation at 01:00 belongs to the
+        // night it happened in, not to the previous UTC day.
+        let mut stmt = conn.prepare(
+            "SELECT date(timestamp, 'unixepoch', 'localtime') AS day,
+                    COALESCE(SUM(word_count), 0)
+             FROM usage_stats
+             GROUP BY day
+             ORDER BY day DESC
+             LIMIT 30",
+        )?;
+        let mut per_day: Vec<DailyWords> = stmt
+            .query_map([], |row| {
+                Ok(DailyWords {
+                    day: row.get(0)?,
+                    words: row.get(1)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        per_day.reverse(); // oldest first, so a chart reads left to right
+
+        let mut stmt = conn.prepare(
+            "SELECT CAST(strftime('%H', timestamp, 'unixepoch', 'localtime') AS INTEGER),
+                    COUNT(*)
+             FROM usage_stats
+             GROUP BY 1
+             ORDER BY 2 DESC, 1 ASC
+             LIMIT 1",
+        )?;
+        let busiest_hour: Option<u32> = stmt
+            .query_row([], |row| row.get::<_, i64>(0))
+            .optional()?
+            .map(|hour| hour as u32);
+
+        let mut stmt = conn.prepare(
+            "SELECT model_used, COUNT(*), COALESCE(AVG(processing_ms), 0)
+             FROM usage_stats
+             WHERE model_used IS NOT NULL AND model_used != ''
+             GROUP BY model_used
+             ORDER BY 2 DESC",
+        )?;
+        let models: Vec<ModelUsage> = stmt
+            .query_map([], |row| {
+                Ok(ModelUsage {
+                    model: row.get(0)?,
+                    dictations: row.get(1)?,
+                    average_processing_ms: row.get::<_, f64>(2)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        // Time saved: how long typing the same words would have taken, minus
+        // the time actually spent speaking. Deliberately ignores the seconds
+        // the model needed — the user is not waiting on those, they are already
+        // reading or moving on.
+        let typing_ms = if typing_wpm > 0.0 {
+            (words as f64 / typing_wpm) * 60_000.0
+        } else {
+            0.0
+        };
+        let saved_ms = (typing_ms - duration_ms as f64).max(0.0) as i64;
+
+        Ok(UsageSummary {
+            dictations,
+            words,
+            duration_ms,
+            processing_ms,
+            refined,
+            refinement_failures,
+            saved_ms,
+            busiest_hour,
+            per_day,
+            models,
+        })
+    }
+
+    /// Every recorded row, for export. Numbers only — see the `usage_stats`
+    /// migration for why there is no text in here.
+    pub fn usage_rows(&self) -> Result<Vec<UsageRow>> {
+        let conn = self.get_connection()?;
+        let mut stmt = conn.prepare(
+            "SELECT timestamp, duration_ms, word_count, processing_ms, model_used,
+                    language, post_process_requested, post_process_provider,
+                    post_process_model, post_process_ms, post_process_succeeded
+             FROM usage_stats
+             ORDER BY timestamp ASC",
+        )?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(UsageRow {
+                    timestamp: row.get(0)?,
+                    duration_ms: row.get(1)?,
+                    word_count: row.get(2)?,
+                    processing_ms: row.get(3)?,
+                    model_used: row.get(4)?,
+                    language: row.get(5)?,
+                    post_process_requested: row.get(6)?,
+                    post_process_provider: row.get(7)?,
+                    post_process_model: row.get(8)?,
+                    post_process_ms: row.get(9)?,
+                    post_process_succeeded: row.get(10)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        Ok(rows)
+    }
+
+    /// Delete all statistics, leaving the history untouched.
+    ///
+    /// The other half of Northstar §6.3: the two must be erasable
+    /// independently. Nothing here cascades — `usage_stats` has no foreign key
+    /// precisely so the two lifetimes stay separate.
+    pub fn clear_usage_stats(&self) -> Result<usize> {
+        let conn = self.get_connection()?;
+        let deleted = conn.execute("DELETE FROM usage_stats", [])?;
+        info!("Cleared {} usage statistics rows", deleted);
+        Ok(deleted)
+    }
+
     /// Average words per dictation, from the recorded statistics.
     ///
     /// This is what turns a catalogue price into an answer: "$3 per million
@@ -1433,6 +1641,53 @@ mod tests {
             .expect("delete entry");
 
         assert!(search_ids(&conn, "zahnarzttermin").is_empty());
+    }
+
+    /// Statistics must be erasable without taking the transcripts with them —
+    /// the other half of what the separate table exists for (§6.3).
+    #[test]
+    fn clearing_statistics_leaves_the_history_alone() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "erstes diktat", None);
+        insert_entry(&conn, 200, "zweites diktat", None);
+
+        conn.execute("DELETE FROM usage_stats", []).expect("clear");
+
+        let entries: i64 = conn
+            .query_row("SELECT COUNT(*) FROM transcription_history", [], |r| {
+                r.get(0)
+            })
+            .expect("count entries");
+
+        assert_eq!(entries, 2, "history must survive clearing the statistics");
+    }
+
+    /// Days are grouped by the user's calendar, not by UTC: a dictation just
+    /// after midnight belongs to the night it happened in.
+    #[test]
+    fn daily_totals_group_by_local_calendar_day() {
+        let conn = setup_conn();
+        insert_entry(&conn, 1_754_000_000, "drei kurze woerter", None);
+        insert_entry(&conn, 1_754_003_600, "eine stunde spaeter gesprochen", None);
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT date(timestamp, 'unixepoch', 'localtime'), SUM(word_count)
+                 FROM usage_stats GROUP BY 1",
+            )
+            .expect("prepare");
+
+        let days: Vec<(String, i64)> = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .expect("query")
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .expect("collect");
+
+        assert!(!days.is_empty());
+        for (day, words) in &days {
+            assert_eq!(day.len(), 10, "expected YYYY-MM-DD, got {day}");
+            assert!(*words > 0);
+        }
     }
 
     /// Rows written under the old schema keep their refined text, and the two

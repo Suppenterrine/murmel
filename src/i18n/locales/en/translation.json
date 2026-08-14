@@ -19,6 +19,7 @@
   },
   "sidebar": {
     "home": "Home",
+    "insights": "Insights",
     "general": "General",
     "models": "Models",
     "advanced": "Advanced",
@@ -486,6 +487,44 @@
         "selectToEdit": "Select a prompt above to view and edit its details.",
         "createFirst": "Click 'Create New Prompt' above to create your first post-processing prompt."
       }
+    },
+    "insights": {
+      "title": "Insights",
+      "description": "What dictating produces anyway, added up. None of it leaves this machine, and the dictated text itself is never stored for these figures.",
+      "empty": "No data yet. The numbers gather here as soon as you start dictating.",
+      "dictations": "Dictations",
+      "words": "Words",
+      "spoken": "Spoken",
+      "saved": "Saved",
+      "perDay": "Words per day",
+      "dayTooltip": "{{day}}: {{words}} words",
+      "minutes": "{{minutes}} min",
+      "hoursMinutes": "{{hours}} h {{minutes}} min",
+      "wpm": "{{wpm}} words/min",
+      "hourRange": "{{from}}:00–{{to}}:00",
+      "ofDictations": "{{count}} of {{total}}",
+      "failures": "({{count}} failed)",
+      "modelSummary": "{{count}}× · avg {{seconds}} s",
+      "details": {
+        "title": "In detail",
+        "pace": "Speaking pace",
+        "paceDescription": "Words per minute across all dictations.",
+        "busiestHour": "Busiest time",
+        "busiestHourDescription": "The hour you dictate in most often.",
+        "refined": "Refined",
+        "refinedDescription": "How many dictations went through a language model.",
+        "modelDescription": "Dictations and average recognition time."
+      },
+      "data": {
+        "title": "Your data",
+        "export": "Export",
+        "exportDescription": "All figures as a file — to keep or to analyse.",
+        "clear": "Reset statistics",
+        "clearDescription": "Deletes all figures. Your history with the transcripts stays untouched.",
+        "clearButton": "Reset"
+      },
+      "clearTitle": "Reset statistics",
+      "clearConfirm": "Delete all usage figures? Your history with the transcripts is kept. This cannot be undone."
     },
     "history": {
       "title": "History",
