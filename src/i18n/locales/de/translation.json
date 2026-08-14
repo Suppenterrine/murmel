@@ -614,7 +614,9 @@
       "kind": {
         "command": "Befehl",
         "rewrite": "Umgeschrieben"
-      }
+      },
+      "refinementRetry": "Erneut veredeln",
+      "refinementRetrying": "Läuft …"
     },
     "debug": {
       "title": "Debug",

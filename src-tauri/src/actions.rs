@@ -483,6 +483,93 @@ fn resolve_effective_language(app: &AppHandle, settings: &AppSettings) -> String
     }
 }
 
+/// Run refinement once more over an entry that already has a failed attempt.
+///
+/// The input comes from the recorded run rather than from the transcript: for a
+/// Command Mode entry the transcript is the *instruction*, and the text it acted
+/// on lives in `input_text`. Reading the transcript here would rewrite the
+/// instruction instead of the selection.
+///
+/// The configuration is the current one, not the one the failed run used. A
+/// retry exists because something was wrong — an unreachable endpoint, a model
+/// that was not installed — and repeating it under the same settings would
+/// repeat the failure by design.
+pub(crate) async fn retry_refinement(
+    app: &AppHandle,
+    entry: &crate::managers::history::HistoryEntry,
+) -> Result<NewPostProcessRun, String> {
+    use crate::managers::history::EntryKind;
+
+    let settings = get_settings(app);
+
+    let previous = entry
+        .last_post_process
+        .as_ref()
+        .ok_or_else(|| "This entry has no refinement to repeat.".to_string())?;
+
+    let input = previous.input_text.clone();
+    if input.trim().is_empty() {
+        return Err("There is no text to refine.".to_string());
+    }
+
+    // Which prompt applies follows from what the entry is, exactly as it did
+    // when the hotkey ran.
+    let (prompt, prompt_id, payload) = match entry.kind {
+        EntryKind::Command => (
+            format!("{COMMAND_PROMPT}\n\n${{output}}"),
+            None,
+            build_command_message(&input, &entry.transcription_text),
+        ),
+        EntryKind::Rewrite => {
+            let id = settings.rewrite_prompt_id.clone();
+            let prompt = resolve_prompt_text(&settings, id.as_deref())
+                .ok_or_else(|| "No instruction is selected for rewriting.".to_string())?;
+            (prompt, id, input.clone())
+        }
+        EntryKind::Dictation => {
+            let id = settings.post_process_selected_prompt_id.clone();
+            let prompt = resolve_prompt_text(&settings, id.as_deref())
+                .ok_or_else(|| "No refinement prompt is selected.".to_string())?;
+            (prompt, id, input.clone())
+        }
+    };
+
+    let started = Instant::now();
+    let outcome = post_process_transcription(&settings, &payload, &prompt).await;
+    let duration_ms = Some(started.elapsed().as_millis() as i64);
+
+    match outcome {
+        Ok(Some(text)) => Ok(build_llm_run(
+            &settings,
+            prompt_id,
+            input,
+            Some(text),
+            duration_ms,
+            None,
+        )),
+        // Nothing ran at all — no provider or no model. That is a configuration
+        // problem, not an attempt, so it gets no history row of its own.
+        Ok(None) => Err("Refinement is not fully configured yet.".to_string()),
+        Err(reason) => {
+            // Recorded even though it failed again: two failures in a row say
+            // more about a local model than one does.
+            let run = build_llm_run(
+                &settings,
+                prompt_id,
+                input,
+                None,
+                duration_ms,
+                Some(reason.clone()),
+            );
+            let history = app.state::<Arc<HistoryManager>>();
+            if let Err(err) = history.append_post_process_run(entry.id, run) {
+                error!("Failed to record the failed retry: {err}");
+            }
+            Err(reason)
+        }
+    }
+}
+
 pub(crate) async fn process_transcription_output(
     app: &AppHandle,
     transcription: &str,

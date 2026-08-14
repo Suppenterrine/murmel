@@ -614,7 +614,9 @@
       "kind": {
         "command": "Command",
         "rewrite": "Rewritten"
-      }
+      },
+      "refinementRetry": "Refine again",
+      "refinementRetrying": "Running …"
     },
     "debug": {
       "title": "Debug",

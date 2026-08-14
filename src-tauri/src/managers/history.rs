@@ -914,6 +914,52 @@ impl HistoryManager {
         Ok(entry)
     }
 
+    /// Append one more refinement pass to an entry that already exists.
+    ///
+    /// Unlike [`Self::update_transcription`], nothing about the dictation
+    /// changes: the transcript, the audio and every metric describe what was
+    /// spoken, and running the text past a language model a second time does
+    /// not alter any of that. Only `post_process_runs` grows — which is exactly
+    /// what it was split into its own table for.
+    ///
+    /// The statistics row is deliberately untouched. It summarises the *first*
+    /// attempt; letting a retry overwrite it would erase the failure from the
+    /// numbers that exist to show how often refinement fails.
+    pub fn append_post_process_run(&self, id: i64, run: NewPostProcessRun) -> Result<HistoryEntry> {
+        let mut conn = self.get_connection()?;
+        let tx = conn.transaction()?;
+
+        let exists: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM transcription_history WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )?;
+        if exists == 0 {
+            return Err(anyhow!("History entry {} not found", id));
+        }
+
+        Self::insert_post_process_run(&tx, id, Utc::now().timestamp(), run)?;
+        tx.commit()?;
+
+        let entry = conn.query_row(
+            &format!("{ENTRY_SELECT} WHERE h.id = ?1"),
+            params![id],
+            Self::map_history_entry,
+        )?;
+
+        debug!("Appended a refinement run to history entry {}", id);
+
+        if let Err(e) = (HistoryUpdatePayload::Updated {
+            entry: entry.clone(),
+        })
+        .emit(&self.app_handle)
+        {
+            error!("Failed to emit history-updated event: {}", e);
+        }
+
+        Ok(entry)
+    }
+
     pub fn cleanup_old_entries(&self) -> Result<()> {
         let retention_period = crate::settings::get_recording_retention_period(&self.app_handle);
 
@@ -1698,6 +1744,97 @@ mod tests {
         assert!(!run.succeeded);
         assert_eq!(run.error.as_deref(), Some("connection refused"));
         assert_eq!(entry.display_text(), "raw");
+    }
+
+    /// A successful retry after a failure: the newer run wins for display, and
+    /// the failed one stays on record. Losing it would erase the evidence that
+    /// the refinement model is unreliable — the very thing the statistics count.
+    #[test]
+    fn a_retry_is_an_additional_run_not_a_replacement() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "raw", None);
+
+        let failed = NewPostProcessRun {
+            provider_id: "ollama".to_string(),
+            model: Some("llama3.2".to_string()),
+            prompt_id: Some("preset_tidy".to_string()),
+            prompt_text: Some("tidy this".to_string()),
+            input_text: "raw".to_string(),
+            output_text: None,
+            duration_ms: Some(1200),
+            succeeded: false,
+            error: Some("connection refused".to_string()),
+        };
+        HistoryManager::insert_post_process_run(&conn, 1, 100, failed.clone())
+            .expect("insert failed run");
+
+        HistoryManager::insert_post_process_run(
+            &conn,
+            1,
+            200,
+            NewPostProcessRun {
+                output_text: Some("tidied".to_string()),
+                succeeded: true,
+                error: None,
+                ..failed
+            },
+        )
+        .expect("insert retry");
+
+        let entry = HistoryManager::get_latest_entry_with_conn(&conn)
+            .expect("fetch entry")
+            .expect("entry exists");
+
+        assert_eq!(entry.display_text(), "tidied");
+        assert!(entry.last_post_process.as_ref().unwrap().succeeded);
+
+        let runs: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM post_process_runs WHERE history_id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count runs");
+        assert_eq!(runs, 2, "the failed attempt must survive the retry");
+    }
+
+    /// A retry reads its input from the recorded run, not from the transcript.
+    /// For a Command Mode entry those are different things — the transcript is
+    /// the spoken instruction — and confusing them would rewrite the
+    /// instruction instead of the text it applied to.
+    #[test]
+    fn a_command_entry_keeps_instruction_and_material_apart() {
+        let conn = setup_conn();
+        insert_rewrite(&conn, 100, EntryKind::Command, "mach das kuerzer");
+
+        HistoryManager::insert_post_process_run(
+            &conn,
+            1,
+            100,
+            NewPostProcessRun {
+                provider_id: "ollama".to_string(),
+                model: Some("llama3.2".to_string()),
+                prompt_id: None,
+                prompt_text: None,
+                input_text: "Ein langer Absatz, der gekuerzt werden soll.".to_string(),
+                output_text: None,
+                duration_ms: Some(900),
+                succeeded: false,
+                error: Some("timeout".to_string()),
+            },
+        )
+        .expect("insert failed run");
+
+        let entry = HistoryManager::get_latest_entry_with_conn(&conn)
+            .expect("fetch entry")
+            .expect("entry exists");
+
+        assert_eq!(entry.kind, EntryKind::Command);
+        assert_eq!(entry.transcription_text, "mach das kuerzer");
+        assert_eq!(
+            entry.last_post_process.as_ref().unwrap().input_text,
+            "Ein langer Absatz, der gekuerzt werden soll."
+        );
     }
 
     /// `ON DELETE CASCADE` only works when foreign keys are enabled on the

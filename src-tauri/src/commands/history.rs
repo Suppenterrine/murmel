@@ -239,6 +239,32 @@ pub async fn retry_history_entry_transcription(
         .map_err(|e| e.to_string())
 }
 
+/// Run refinement over an entry again, after a failed attempt.
+///
+/// Nothing is pasted: the user is looking at the history, not at the window the
+/// text was meant for. The result lands on the entry, where it can be read and
+/// copied.
+#[tauri::command]
+#[specta::specta]
+pub async fn retry_history_entry_refinement(
+    app: AppHandle,
+    history_manager: State<'_, Arc<HistoryManager>>,
+    id: i64,
+) -> Result<(), String> {
+    let entry = history_manager
+        .get_entry_by_id(id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("History entry {} not found", id))?;
+
+    let run = crate::actions::retry_refinement(&app, &entry).await?;
+
+    history_manager
+        .append_post_process_run(id, run)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn update_history_limit(

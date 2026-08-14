@@ -539,6 +539,8 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
 
       <EntryMetrics entry={entry} />
 
+      <RefinementFailure entry={entry} />
+
       {hasRecording && (
         <AudioPlayer onLoadRequest={handleLoadAudio} className="w-full" />
       )}
@@ -710,10 +712,7 @@ const EntryMetrics: React.FC<{ entry: HistoryEntry }> = ({ entry }) => {
 
   if (entry.model_used) parts.push(entry.model_used);
 
-  const run = entry.last_post_process;
-  const refinementFailed = run != null && !run.succeeded;
-
-  if (parts.length === 0 && !refinementFailed) return null;
+  if (parts.length === 0) return null;
 
   return (
     <p className="text-xs text-text/40 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -723,11 +722,66 @@ const EntryMetrics: React.FC<{ entry: HistoryEntry }> = ({ entry }) => {
           {part}
         </span>
       ))}
-      {refinementFailed && (
-        <span className="text-warning" title={run?.error ?? undefined}>
-          {t("settings.history.metrics.refinementFailed")}
-        </span>
-      )}
     </p>
+  );
+};
+
+/**
+ * A refinement that failed, said out loud.
+ *
+ * This used to be three words in the metrics line with the reason hidden in a
+ * `title` — visible only to whoever thought to hover. A failure the user cannot
+ * read is a failure they cannot act on, and there *is* an action: the text is
+ * still here, so the pass can simply be run again.
+ */
+const RefinementFailure: React.FC<{ entry: HistoryEntry }> = ({ entry }) => {
+  const { t } = useTranslation();
+  const [retrying, setRetrying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = entry.last_post_process;
+  if (run == null || run.succeeded) return null;
+
+  const retry = async () => {
+    setRetrying(true);
+    setError(null);
+    try {
+      const result = await commands.retryHistoryEntryRefinement(entry.id);
+      // The entry refreshes itself through the history-updated event, so a
+      // success needs no handling here — the component simply disappears.
+      if (result.status !== "ok") setError(String(result.error));
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg border border-warning/25 bg-warning/5 px-3 py-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className="text-xs font-medium text-warning">
+            {t("settings.history.metrics.refinementFailed")}
+          </span>
+          {(error ?? run.error) && (
+            <span className="text-xs text-text/50 break-words">
+              {error ?? run.error}
+            </span>
+          )}
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={retry}
+          disabled={retrying}
+          className="shrink-0"
+        >
+          {retrying
+            ? t("settings.history.refinementRetrying")
+            : t("settings.history.refinementRetry")}
+        </Button>
+      </div>
+    </div>
   );
 };
