@@ -51,12 +51,19 @@ const OVERLAY_HEIGHT: f64 = 46.0;
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
 
+// Wide enough for a sentence, tall enough for the second line under it.
+const OVERLAY_PROBLEM_WIDTH: f64 = 360.0;
+const OVERLAY_PROBLEM_HEIGHT: f64 = 76.0;
+
 /// Overlay window size (logical) for a given UI state.
 fn overlay_dimensions(state: &str) -> (f64, f64) {
-    if state == "streaming" {
-        (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT)
-    } else {
-        (OVERLAY_WIDTH, OVERLAY_HEIGHT)
+    match state {
+        "streaming" => (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT),
+        // A problem is two lines — what failed, and whether the words survived
+        // it. Both are worth the extra room; a truncated reason sends the user
+        // to the log, which is the trip this exists to save.
+        "problem" => (OVERLAY_PROBLEM_WIDTH, OVERLAY_PROBLEM_HEIGHT),
+        _ => (OVERLAY_WIDTH, OVERLAY_HEIGHT),
     }
 }
 
@@ -300,7 +307,14 @@ fn current_overlay_logical_size(window: &tauri::webview::WebviewWindow) -> Optio
 }
 
 #[cfg(target_os = "windows")]
-static WINDOWS_OVERLAY_IS_STREAMING: AtomicBool = AtomicBool::new(false);
+/// The size the overlay was last shown at.
+///
+/// Repositioning (a settings change, a monitor switch) has to re-assert the
+/// window bounds, and for that it needs the size of whatever is currently on
+/// screen. This used to be a "streaming or not" flag, which answered the
+/// question only as long as there were exactly two sizes; keeping the size
+/// itself answers it for every state there will ever be.
+static WINDOWS_OVERLAY_SIZE: Mutex<(f64, f64)> = Mutex::new((OVERLAY_WIDTH, OVERLAY_HEIGHT));
 
 /// Overlay rectangle in the destination monitor's physical pixels, so nothing
 /// is converted through the window's previous-monitor DPI.
@@ -581,7 +595,9 @@ fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
             let _ =
                 overlay_window.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
             #[cfg(target_os = "windows")]
-            WINDOWS_OVERLAY_IS_STREAMING.store(state == "streaming", Ordering::Relaxed);
+            if let Ok(mut last) = WINDOWS_OVERLAY_SIZE.lock() {
+                *last = (width, height);
+            }
             let size_elapsed = size_started.elapsed();
 
             let pos_started = std::time::Instant::now();
@@ -664,6 +680,34 @@ pub fn show_processing_overlay(app_handle: &AppHandle) {
     show_overlay_state(app_handle, "processing");
 }
 
+/// Show a problem where the user is already looking.
+///
+/// Sent as its own event rather than through `show-overlay`: a problem carries
+/// a payload the state changes do not have, and it must be able to appear when
+/// no dictation is running at all — a rewrite hotkey pressed with nothing
+/// selected has no recording to attach itself to.
+///
+/// The overlay decides how long to stay; from here it is fire-and-forget, so a
+/// failure in reporting a failure cannot cascade.
+pub fn show_problem(app_handle: &AppHandle, report: &crate::problem::ProblemReport) {
+    let settings = settings::get_settings(app_handle);
+    if settings.overlay_style == OverlayStyle::None {
+        // The user turned the overlay off. The window toast and the log still
+        // carry the message; putting a window on screen anyway would override a
+        // choice they made deliberately.
+        return;
+    }
+
+    let handle = app_handle.clone();
+    let report = report.clone();
+    let _ = app_handle.run_on_main_thread(move || {
+        show_overlay_state_on_main(&handle, "problem");
+        if let Some(window) = handle.get_webview_window("recording_overlay") {
+            let _ = window.emit("show-problem", report);
+        }
+    });
+}
+
 /// Updates the overlay window position based on current settings
 pub fn update_overlay_position(app_handle: &AppHandle) {
     // Positioning queries monitors/cursor (GDK/Xlib on Linux) and moves the
@@ -686,12 +730,10 @@ fn update_overlay_position_on_main(app_handle: &AppHandle) {
 
         #[cfg(target_os = "windows")]
         {
-            let state = if WINDOWS_OVERLAY_IS_STREAMING.load(Ordering::Relaxed) {
-                "streaming"
-            } else {
-                "recording"
-            };
-            let (width, height) = overlay_dimensions(state);
+            let (width, height) = WINDOWS_OVERLAY_SIZE
+                .lock()
+                .map(|size| *size)
+                .unwrap_or((OVERLAY_WIDTH, OVERLAY_HEIGHT));
             if let Err(error) = place_windows_overlay(app_handle, &overlay_window, width, height) {
                 log::error!("Failed to update recording overlay position: {error}");
             }

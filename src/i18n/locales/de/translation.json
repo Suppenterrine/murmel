@@ -809,22 +809,12 @@
   },
   "errors": {
     "loadDirectory": "Fehler beim Laden des Verzeichnisses: {{error}}",
-    "micPermissionDeniedTitle": "Mikrofonzugriff verweigert",
     "micPermissionDenied": {
       "generic": "Der Mikrofonzugriff wurde vom Betriebssystem verweigert. Bitte erteile die Mikrofonberechtigung in deinen Systemeinstellungen.",
       "windows": "Aktiviere den Mikrofonzugriff unter Einstellungen → Datenschutz und Sicherheit → Mikrofon (einschließlich Desktop-App-Zugriff).",
       "macos": "Erteile den Mikrofonzugriff in Systemeinstellungen → Datenschutz & Sicherheit → Mikrofon.",
       "linux": "Erteile den Mikrofonzugriff in den Sound- oder Datenschutzeinstellungen deines Systems."
-    },
-    "noInputDeviceTitle": "Kein Mikrofon gefunden",
-    "noInputDevice": "Es wurde kein Audio-Eingabegerät erkannt. Bitte schließe ein Mikrofon oder Headset an und versuche es erneut.",
-    "recordingFailed": "Aufnahme konnte nicht gestartet werden: {{error}}",
-    "modelLoadFailed": "Modell konnte nicht geladen werden: {{model}}",
-    "modelLoadFailedUnknown": "unbekanntes Modell",
-    "pasteFailedTitle": "Text konnte nicht eingefügt werden",
-    "pasteFailed": "Der Text konnte nicht in die aktive Anwendung eingefügt werden.",
-    "transcriptionFailedTitle": "Transkription fehlgeschlagen",
-    "rewriteFailedTitle": "Umschreiben fehlgeschlagen"
+    }
   },
   "appLanguage": {
     "title": "Anwendungssprache",
@@ -857,6 +847,20 @@
     "recorderBlockedNoCulprit": "macOS blockiert vorübergehend Änderungen an Tastenkürzeln",
     "learnMore": "So behebst du das",
     "recorderBlocked": "Tastenkürzel können gerade nicht aufgezeichnet werden — macOS Secure Input blockiert Tastenereignisse. Behebe zuerst die Secure-Input-Warnung.",
+    "dismiss": "Ausblenden"
+  },
+  "problem": {
+    "microphonePermission": "Mikrofon ist blockiert",
+    "noInputDevice": "Kein Mikrofon gefunden",
+    "recordingFailed": "Aufnahme fehlgeschlagen",
+    "transcriptionFailed": "Transkription fehlgeschlagen",
+    "modelLoadFailed": "Modell konnte nicht geladen werden",
+    "refinementFailed": "Sprachmodell nicht erreichbar",
+    "nothingSelected": "Nichts markiert",
+    "pasteFailed": "Text konnte nicht eingefügt werden",
+    "dictionaryFailed": "Korrektur konnte nicht übernommen werden",
+    "unknown": "Etwas ist schiefgelaufen",
+    "inHistory": "Die Aufnahme liegt im Verlauf",
     "dismiss": "Ausblenden"
   }
 }

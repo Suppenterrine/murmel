@@ -812,22 +812,12 @@
   },
   "errors": {
     "loadDirectory": "Error loading directory: {{error}}",
-    "micPermissionDeniedTitle": "Microphone Access Denied",
     "micPermissionDenied": {
       "generic": "Microphone access was denied by the operating system. Please grant microphone permission in your system settings.",
       "windows": "Enable microphone access in Settings → Privacy & security → Microphone (including desktop app access).",
       "macos": "Grant microphone access in System Settings → Privacy & Security → Microphone.",
       "linux": "Grant microphone access in your system's sound or privacy settings."
-    },
-    "noInputDeviceTitle": "No Microphone Found",
-    "noInputDevice": "No audio input device was detected. Please connect a microphone or headset and try again.",
-    "recordingFailed": "Failed to start recording: {{error}}",
-    "modelLoadFailed": "Failed to load model: {{model}}",
-    "modelLoadFailedUnknown": "unknown model",
-    "pasteFailedTitle": "Failed to Paste Text",
-    "pasteFailed": "Text could not be pasted into the active application.",
-    "transcriptionFailedTitle": "Transcription Failed",
-    "rewriteFailedTitle": "Rewrite Failed"
+    }
   },
   "appLanguage": {
     "title": "Application Language",
@@ -857,6 +847,20 @@
     "recorderBlockedNoCulprit": "macOS is temporarily blocking shortcut changes",
     "learnMore": "How to fix",
     "recorderBlocked": "Can't record shortcuts right now — macOS Secure Input is blocking key events. Resolve the Secure Input warning first.",
+    "dismiss": "Dismiss"
+  },
+  "problem": {
+    "microphonePermission": "Microphone is blocked",
+    "noInputDevice": "No microphone found",
+    "recordingFailed": "Recording failed",
+    "transcriptionFailed": "Transcription failed",
+    "modelLoadFailed": "Model could not be loaded",
+    "refinementFailed": "Language model unreachable",
+    "nothingSelected": "Nothing selected",
+    "pasteFailed": "Text could not be inserted",
+    "dictionaryFailed": "Correction could not be saved",
+    "unknown": "Something went wrong",
+    "inHistory": "The recording is in your history",
     "dismiss": "Dismiss"
   }
 }

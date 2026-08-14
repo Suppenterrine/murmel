@@ -9,6 +9,7 @@ use crate::managers::history::{
 use crate::managers::model::ModelManager;
 use crate::managers::transcription::StreamWorkKind;
 use crate::managers::transcription::TranscriptionManager;
+use crate::problem::Problem;
 use crate::settings::{get_settings, AppSettings, OverlayStyle, APPLE_INTELLIGENCE_PROVIDER_ID};
 use crate::shortcut;
 use crate::tray::{change_tray_icon, TrayIconState};
@@ -27,12 +28,6 @@ use tauri::Manager;
 use tauri::{AppHandle, Emitter};
 
 const CANCELLATION_POLL_INTERVAL: Duration = Duration::from_millis(25);
-
-#[derive(Clone, serde::Serialize)]
-struct RecordingErrorEvent {
-    error_type: String,
-    detail: Option<String>,
-}
 
 /// Drop guard that notifies the [`TranscriptionCoordinator`] when the
 /// transcription pipeline finishes — whether it completes normally or panics.
@@ -595,8 +590,7 @@ async fn produce_output(
                 Err(err) => err,
                 _ => "Nothing was selected.".to_string(),
             };
-            warn!("Command Mode has nothing to work on: {reason}");
-            let _ = app.emit("rewrite-error", reason);
+            crate::problem::report(app, Problem::NothingSelected, Some(reason));
             return ProcessedTranscription {
                 final_text: String::new(),
                 post_process: Vec::new(),
@@ -887,20 +881,14 @@ impl ShortcutAction for TranscribeAction {
             utils::hide_recording_overlay(app);
             change_tray_icon(app, TrayIconState::Idle);
             if let Some(err) = recording_error {
-                let error_type = if is_microphone_access_denied(&err) {
-                    "microphone_permission_denied"
+                let problem = if is_microphone_access_denied(&err) {
+                    Problem::MicrophonePermission
                 } else if is_no_input_device_error(&err) {
-                    "no_input_device"
+                    Problem::NoInputDevice
                 } else {
-                    "unknown"
+                    Problem::RecordingFailed
                 };
-                let _ = app.emit(
-                    "recording-error",
-                    RecordingErrorEvent {
-                        error_type: error_type.to_string(),
-                        detail: Some(err),
-                    },
-                );
+                crate::problem::report(app, problem, Some(err));
             }
         }
 
@@ -1118,8 +1106,11 @@ impl ShortcutAction for TranscribeAction {
                                             paste_time.elapsed()
                                         ),
                                         Err(e) => {
-                                            error!("Failed to paste transcription: {}", e);
-                                            let _ = ah_clone.emit("paste-error", ());
+                                            crate::problem::report(
+                                                &ah_clone,
+                                                Problem::PasteFailed,
+                                                Some(e),
+                                            );
                                         }
                                     }
                                     utils::hide_recording_overlay(&ah_clone);
@@ -1142,10 +1133,14 @@ impl ShortcutAction for TranscribeAction {
                                 return;
                             }
 
-                            error!("Transcription failed: {}", err);
-                            // Surface the failure to the UI (toast). The full
-                            // message is also in murmel.log via the line above.
-                            let _ = ah.emit("transcription-error", err.to_string());
+                            // The audio is kept below, so this one is
+                            // recoverable: the history entry can be transcribed
+                            // again once whatever failed is fixed.
+                            crate::problem::report(
+                                &ah,
+                                Problem::TranscriptionFailed,
+                                Some(err.to_string()),
+                            );
                             // Save entry with empty text so user can retry.
                             // Only the audio length is known here; the rest
                             // stays NULL and the statistics skip this row.
@@ -1243,8 +1238,12 @@ impl ShortcutAction for RewriteSelectionAction {
             match outcome {
                 Ok(()) => debug!("Selection rewritten"),
                 Err(err) => {
-                    warn!("Could not rewrite the selection: {err}");
-                    let _ = app.emit("rewrite-error", err);
+                    let problem = if err.contains("Nothing was selected") {
+                        Problem::NothingSelected
+                    } else {
+                        Problem::RefinementFailed
+                    };
+                    crate::problem::report(&app, problem, Some(err));
                 }
             }
         });
@@ -1309,8 +1308,7 @@ async fn rewrite_selection(app: &AppHandle) -> Result<(), String> {
     let text = rewritten;
     app.run_on_main_thread(move || {
         if let Err(err) = utils::paste(text, handle.clone()) {
-            error!("Failed to paste the rewritten selection: {}", err);
-            let _ = handle.emit("paste-error", ());
+            crate::problem::report(&handle, Problem::PasteFailed, Some(err));
         }
     })
     .map_err(|err| format!("Could not paste the result: {err}"))?;
@@ -1382,8 +1380,7 @@ impl ShortcutAction for CaptureCorrectionAction {
                     let _ = app.emit("dictionary-learned", Vec::<String>::new());
                 }
                 Err(err) => {
-                    warn!("Could not capture correction: {err}");
-                    let _ = app.emit("dictionary-error", err);
+                    crate::problem::report(&app, Problem::DictionaryFailed, Some(err));
                 }
             }
         });

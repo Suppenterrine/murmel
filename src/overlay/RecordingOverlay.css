@@ -226,6 +226,50 @@
   width: var(--ov-work-w);
 }
 
+/* A problem needs room for a sentence and a line under it, so it drops the
+   fixed pill widths entirely and fills the window it was given. */
+.scard.compact.cproblem {
+  width: 344px;
+  border-radius: 14px;
+}
+.sproblem {
+  height: auto;
+  min-height: 56px;
+  padding: 10px 12px;
+  align-items: start;
+}
+.sproblem-icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin-top: 1px;
+  color: var(--s-warn, #c46a3a);
+}
+.sproblem-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  justify-self: stretch;
+  text-align: start;
+}
+.sproblem-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  /* Two lines, then ellipsis: a reason that needs more than that belongs in the
+     history, where there is room to read it. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sproblem-hint {
+  font-size: 10.5px;
+  opacity: 0.65;
+  line-height: 1.2;
+}
+
 /* Command Mode carries a word where the other modes carry a 11px icon, and the
    resting pill has no room for it: the label alone is wider than the waveform,
    and the equal side columns below would demand the same width again on the

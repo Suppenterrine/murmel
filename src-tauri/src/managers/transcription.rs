@@ -543,6 +543,16 @@ impl TranscriptionManager {
                     error: Some(error_msg.to_string()),
                 },
             );
+
+            // The event above drives the model list in the settings window. This
+            // also puts it in front of someone who has that window closed —
+            // without a model there is no dictation at all, so it is the last
+            // failure that should stay quiet.
+            crate::problem::report(
+                &self.app_handle,
+                crate::problem::Problem::ModelLoadFailed,
+                Some(format!("{}: {error_msg}", model_info.name)),
+            );
         };
 
         let loaded_engine = match model_info.engine_type {

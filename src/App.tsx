@@ -7,7 +7,7 @@ import {
   checkAccessibilityPermission,
   checkMicrophonePermission,
 } from "tauri-plugin-macos-permissions-api";
-import { ModelStateEvent, RecordingErrorEvent } from "./lib/types/events";
+import { ProblemReport } from "./lib/types/events";
 import "./App.css";
 import AccessibilityPermissions from "./components/AccessibilityPermissions";
 import SecureInputWarning from "./components/SecureInputWarning";
@@ -110,34 +110,38 @@ function App() {
     };
   }, [settings?.debug_mode, updateSetting]);
 
-  // Listen for recording errors from the backend and show a toast
+  // One listener for every failure the backend reports.
+  //
+  // This used to be five, each with its own event name and its own wording for
+  // the same idea. The overlay is the primary channel now — see `problem.rs` —
+  // and this is the copy for whoever happens to have the window open, so the
+  // two must say the same thing. Sharing the payload is what guarantees that.
   useEffect(() => {
-    const unlisten = listen<RecordingErrorEvent>("recording-error", (event) => {
-      const { error_type, detail } = event.payload;
+    const unlisten = listen<ProblemReport>("murmel-problem", (event) => {
+      const { key, detail, recoverable } = event.payload;
 
-      if (error_type === "microphone_permission_denied") {
-        const currentPlatform = platform();
-        const platformKey = `errors.micPermissionDenied.${currentPlatform}`;
-        const description = t(platformKey, {
-          defaultValue: t("errors.micPermissionDenied.generic"),
-        });
-        toast.error(t("errors.micPermissionDeniedTitle"), { description });
-      } else if (error_type === "no_input_device") {
-        toast.error(t("errors.noInputDeviceTitle"), {
-          description: t("errors.noInputDevice"),
-        });
-      } else {
-        toast.error(
-          t("errors.recordingFailed", { error: detail ?? "Unknown error" }),
-        );
-      }
+      // The microphone case is the one where the wording differs per platform:
+      // "check System Settings" means a different journey on each.
+      const description =
+        key === "microphonePermission"
+          ? t(`errors.micPermissionDenied.${platform()}`, {
+              defaultValue: t("errors.micPermissionDenied.generic"),
+            })
+          : recoverable
+            ? [detail, t("problem.inHistory")].filter(Boolean).join(" · ")
+            : (detail ?? undefined);
+
+      toast.error(t(`problem.${key}`, { defaultValue: t("problem.unknown") }), {
+        description,
+      });
     });
     return () => {
       unlisten.then((fn) => fn());
     };
   }, [t]);
 
-  // Words learned from a correction captured in another window.
+  // Words learned from a correction captured in another window. Not a failure,
+  // so it keeps its own channel: this one is worth a green toast.
   useEffect(() => {
     const unlistenLearned = listen<string[]>("dictionary-learned", (event) => {
       const words = event.payload;
@@ -150,76 +154,8 @@ function App() {
       });
     });
 
-    const unlistenError = listen<string>("dictionary-error", (event) => {
-      toast.error(t("dictionary.captureFailed"), {
-        description: event.payload,
-      });
-    });
-
     return () => {
       unlistenLearned.then((fn) => fn());
-      unlistenError.then((fn) => fn());
-    };
-  }, [t]);
-
-  // The rewrite hotkey has no window of its own, so a failure has nowhere else
-  // to show up — without this it looks like the key was never registered.
-  useEffect(() => {
-    const unlisten = listen<string>("rewrite-error", (event) => {
-      toast.error(t("errors.rewriteFailedTitle"), {
-        description: event.payload,
-      });
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [t]);
-
-  // Listen for paste failures and show a toast.
-  // The technical error detail is logged to murmel.log on the Rust side
-  // (see actions.rs `error!("Failed to paste transcription: ...")`),
-  // so we show a localized, user-friendly message here instead of the raw error.
-  useEffect(() => {
-    const unlisten = listen("paste-error", () => {
-      toast.error(t("errors.pasteFailedTitle"), {
-        description: t("errors.pasteFailed"),
-      });
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [t]);
-
-  // Listen for transcription failures and show a toast.
-  // The payload is the backend error message (also logged to murmel.log).
-  useEffect(() => {
-    const unlisten = listen<string>("transcription-error", (event) => {
-      toast.error(t("errors.transcriptionFailedTitle"), {
-        description: event.payload,
-      });
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [t]);
-
-  // Listen for model loading failures and show a toast
-  useEffect(() => {
-    const unlisten = listen<ModelStateEvent>("model-state-changed", (event) => {
-      if (event.payload.event_type === "loading_failed") {
-        toast.error(
-          t("errors.modelLoadFailed", {
-            model:
-              event.payload.model_name || t("errors.modelLoadFailedUnknown"),
-          }),
-          {
-            description: event.payload.error,
-          },
-        );
-      }
-    });
-    return () => {
-      unlisten.then((fn) => fn());
     };
   }, [t]);
 

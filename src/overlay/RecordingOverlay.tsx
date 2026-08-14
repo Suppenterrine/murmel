@@ -12,10 +12,29 @@ import type {
 import i18n, { syncLanguageFromSettings } from "@/i18n";
 import { getLanguageDirection } from "@/lib/utils/rtl";
 
-type OverlayState = "recording" | "streaming" | "transcribing" | "processing";
+type OverlayState =
+  | "recording"
+  | "streaming"
+  | "transcribing"
+  | "processing"
+  | "problem";
 
 /** What this dictation is for — see `overlay.rs`. */
 type DictationIntent = "plain" | "refined" | "command";
+
+/** A failure worth telling the user about — see `problem.rs`. */
+type ProblemReport = {
+  /** Translation key suffix under `problem.*`. The backend sends a key rather
+   *  than a sentence, so the wording lives with the rest of the translations. */
+  key: string;
+  detail: string | null;
+  /** Whether the history holds something that can be retried. */
+  recoverable: boolean;
+};
+
+/** How long a problem stays on screen before the overlay gives the desktop back.
+ *  Long enough to read two lines, short enough not to sit in the way. */
+const PROBLEM_VISIBLE_MS = 6000;
 
 // Number of reactive bars in the waveform (the simple, smoothed style shared by
 // every overlay form). Mic levels arrive as 16 FFT buckets; we take the first N.
@@ -33,6 +52,10 @@ const RecordingOverlay: React.FC = () => {
   // is being spoken there is an *instruction*, and a user who thinks they are
   // dictating text gets a paragraph replaced by their own sentence.
   const [intent, setIntent] = useState<DictationIntent>("plain");
+  // The failure currently on screen. Held rather than passed through `state`
+  // because it carries a reason, and the reason is the whole point — "something
+  // went wrong" is what the user already knows.
+  const [problem, setProblem] = useState<ProblemReport | null>(null);
   const [levels, setLevels] = useState<number[]>(Array(WAVE_BARS).fill(0));
   const [streamText, setStreamText] = useState<StreamTextEvent>({
     committed: "",
@@ -100,6 +123,18 @@ const RecordingOverlay: React.FC = () => {
         setIsVisible(false);
       });
 
+      // A problem takes over the overlay: whatever was being shown has failed,
+      // so there is nothing left to keep on screen beside it.
+      const unlistenProblem = await listen<ProblemReport>(
+        "show-problem",
+        async (event) => {
+          await syncLanguageFromSettings();
+          setProblem(event.payload);
+          setState("problem");
+          setIsVisible(true);
+        },
+      );
+
       const unlistenLevel = await listen<number[]>("mic-level", (event) => {
         const newLevels = event.payload as number[];
         // Exponential smoothing across the 16 buckets, then take the first N
@@ -125,6 +160,7 @@ const RecordingOverlay: React.FC = () => {
       return () => {
         unlistenShow();
         unlistenHide();
+        unlistenProblem();
         unlistenLevel();
         unlistenStream();
         unlistenPhase();
@@ -140,6 +176,15 @@ const RecordingOverlay: React.FC = () => {
     const id = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(id);
   }, [state, isVisible]);
+
+  // A problem gives the desktop back on its own. Unlike the working states it
+  // has nothing following it that would take the overlay down — the dictation it
+  // belonged to is over.
+  useEffect(() => {
+    if (state !== "problem" || !isVisible) return;
+    const id = setTimeout(() => setIsVisible(false), PROBLEM_VISIBLE_MS);
+    return () => clearTimeout(id);
+  }, [state, isVisible, problem]);
 
   // Stick to the bottom as text streams in — but only while pinned, so a user who
   // has scrolled up to read history isn't yanked back down by the next chunk.
@@ -239,6 +284,60 @@ const RecordingOverlay: React.FC = () => {
     </div>
   );
 
+  // warning sign (left) | reason (center) | dismiss (right).
+  //
+  // The reason gets the whole middle column and two lines: the user is being
+  // told something they did not expect, and "an error occurred" would send them
+  // to the log — which is exactly the trip this is meant to save.
+  const problemRow = () => (
+    <div className="sbase sproblem">
+      <div className="sbase-l">
+        <svg
+          className="sproblem-icon"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <path d="M12 9v4" />
+          <path d="M12 17h.01" />
+        </svg>
+      </div>
+      <div className="sproblem-text">
+        <span className="sproblem-title">
+          {t(`problem.${problem?.key ?? "unknown"}`, {
+            defaultValue: t("problem.unknown"),
+          })}
+        </span>
+        {problem?.recoverable && (
+          <span className="sproblem-hint">{t("problem.inHistory")}</span>
+        )}
+      </div>
+      <div className="sbase-r">
+        <button
+          className="scancel"
+          onClick={() => setIsVisible(false)}
+          title={t("problem.dismiss")}
+          aria-label={t("problem.dismiss")}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M18 6 6 18M6 6l12 12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+
   // spinner (left) | label (center) | cancel (right) — same 3-zone grid as the
   // listening row, so the label is centered.
   const workingRow = (label: string, showCancel: boolean) => (
@@ -307,6 +406,7 @@ const RecordingOverlay: React.FC = () => {
   // spinner + label (transcribing / processing). Never both. The pill animates its
   // width between them; the cancel button is in both rows so it stays put.
   const working = state === "transcribing" || state === "processing";
+  const failed = state === "problem";
   const workLabel =
     state === "processing"
       ? intent === "command"
@@ -321,12 +421,18 @@ const RecordingOverlay: React.FC = () => {
     >
       <div
         className={`scard compact ${working && isVisible ? "cworking" : ""} ${
+          failed ? "cproblem" : ""
+        } ${
           // Only while listening: the working row has no label beside its
           // spinner, so it needs neither the extra width nor the shifted grid.
-          !working && intent === "command" ? "cintent" : ""
+          !working && !failed && intent === "command" ? "cintent" : ""
         }`}
       >
-        {working ? workingRow(workLabel, true) : listeningRow(false, true)}
+        {failed
+          ? problemRow()
+          : working
+            ? workingRow(workLabel, true)
+            : listeningRow(false, true)}
       </div>
     </div>
   );

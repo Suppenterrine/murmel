@@ -18,6 +18,7 @@ mod overlay;
 mod paste_tx;
 pub mod portable;
 mod post_process_models;
+mod problem;
 mod secrets;
 mod secure_input;
 mod settings;

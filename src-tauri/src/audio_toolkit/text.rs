@@ -31,7 +31,7 @@ fn build_custom_word_match_keys(word: &str, word_index: usize) -> Vec<CustomWord
     let primary_key = build_match_key(word);
     let mut keys = Vec::with_capacity(3);
 
-    let mut push = |key: String, keys: &mut Vec<CustomWordMatchKey>| {
+    let push = |key: String, keys: &mut Vec<CustomWordMatchKey>| {
         // Words this matcher cannot judge are skipped — see
         // `is_supported_fuzzy_key` for which those are and why.
         if is_supported_fuzzy_key(&key) && !keys.iter().any(|existing| existing.key == key) {
