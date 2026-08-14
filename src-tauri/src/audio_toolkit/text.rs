@@ -29,34 +29,100 @@ struct CustomWordMatchKey {
 
 fn build_custom_word_match_keys(word: &str, word_index: usize) -> Vec<CustomWordMatchKey> {
     let primary_key = build_match_key(word);
-    let mut keys = Vec::with_capacity(2);
+    let mut keys = Vec::with_capacity(3);
 
-    // The fallback matcher is intentionally limited to ASCII terms. Its
-    // whitespace tokenization and Soundex scoring are not suitable for CJK
-    // scripts. Unicode custom words remain available to models that accept
-    // them as native decode prompts; they are simply skipped by this fallback.
-    if is_supported_fuzzy_key(&primary_key) {
-        keys.push(CustomWordMatchKey {
-            word_index,
-            key: primary_key.clone(),
-        });
-    }
+    let mut push = |key: String, keys: &mut Vec<CustomWordMatchKey>| {
+        // Words this matcher cannot judge are skipped — see
+        // `is_supported_fuzzy_key` for which those are and why.
+        if is_supported_fuzzy_key(&key) && !keys.iter().any(|existing| existing.key == key) {
+            keys.push(CustomWordMatchKey { word_index, key });
+        }
+    };
+
+    push(primary_key.clone(), &mut keys);
+
+    // A second key without the diacritics. Speech models rarely produce "Grüße"
+    // when they get it wrong — they produce "gruesse" or "grusse", and edit
+    // distance puts those four steps away from the original (of seven), well
+    // past any sane threshold. Against the transliterated key they are a step or
+    // two away, and it is plain ASCII, so the phonetic scoring applies to it as
+    // well.
+    push(transliterate(&primary_key), &mut keys);
 
     if word.contains('&') {
-        let expanded_key = build_match_key(&word.replace('&', " and "));
-        if is_supported_fuzzy_key(&expanded_key) && expanded_key != primary_key {
-            keys.push(CustomWordMatchKey {
-                word_index,
-                key: expanded_key,
-            });
-        }
+        push(build_match_key(&word.replace('&', " and ")), &mut keys);
     }
 
     keys
 }
 
+/// Fold a word onto the letters a keyboard offers without a modifier.
+///
+/// German first, because that is what this fork is used in: the umlauts expand
+/// the way German spells them out (ü → ue), which is also how a recogniser
+/// tends to render them when it misses the diacritic. Everything else drops to
+/// its base letter, which is how those languages spell things out in a pinch.
+fn transliterate(word: &str) -> String {
+    let mut folded = String::with_capacity(word.len());
+
+    for c in word.chars() {
+        match c {
+            'ä' => folded.push_str("ae"),
+            'ö' => folded.push_str("oe"),
+            'ü' => folded.push_str("ue"),
+            'ß' => folded.push_str("ss"),
+            'æ' => folded.push_str("ae"),
+            'œ' => folded.push_str("oe"),
+            'à' | 'á' | 'â' | 'ã' | 'å' => folded.push('a'),
+            'è' | 'é' | 'ê' | 'ë' => folded.push('e'),
+            'ì' | 'í' | 'î' | 'ï' => folded.push('i'),
+            'ò' | 'ó' | 'ô' | 'õ' | 'ø' => folded.push('o'),
+            'ù' | 'ú' | 'û' => folded.push('u'),
+            'ñ' => folded.push('n'),
+            'ç' => folded.push('c'),
+            'ý' | 'ÿ' => folded.push('y'),
+            other => folded.push(other),
+        }
+    }
+
+    folded
+}
+
+/// Whether this matcher can judge a word at all.
+///
+/// This used to demand plain ASCII, which quietly excluded every German entry
+/// with an umlaut or ß — "Grüße" got no key and was never applied. On a Whisper
+/// model that went unnoticed, because there the dictionary reaches the engine as
+/// a decode prompt and this matcher never runs; on any other model the entry was
+/// simply inert. A dictionary that works on some models and not others is worse
+/// than one that does not exist, because it is trusted.
+///
+/// Edit distance handles any alphabet — the ASCII restriction was never needed
+/// for it, and Soundex is gated separately in [`supports_soundex`].
+///
+/// What stays excluded is scripts written without spaces between words. This
+/// matcher slices the transcript on whitespace, so in Chinese or Japanese a
+/// whole clause arrives as one token and any "similarity" it finds is an
+/// artefact of that, not a resemblance.
 fn is_supported_fuzzy_key(key: &str) -> bool {
-    !key.is_empty() && key.chars().all(|c| c.is_ascii_alphanumeric())
+    !key.is_empty()
+        && key.chars().all(|c| c.is_alphanumeric())
+        && !key.chars().any(is_scriptio_continua)
+}
+
+/// Characters from scripts that do not separate words with spaces.
+///
+/// The ranges are the CJK ideographs and the Japanese kana; Korean Hangul is
+/// written with spaces and is therefore not listed.
+fn is_scriptio_continua(c: char) -> bool {
+    matches!(c,
+        '\u{3000}'..='\u{303F}'   // CJK punctuation
+        | '\u{3040}'..='\u{309F}' // Hiragana
+        | '\u{30A0}'..='\u{30FF}' // Katakana
+        | '\u{3400}'..='\u{4DBF}' // CJK Extension A
+        | '\u{4E00}'..='\u{9FFF}' // CJK Unified Ideographs
+        | '\u{F900}'..='\u{FAFF}' // CJK Compatibility Ideographs
+    )
 }
 
 fn supports_soundex(key: &str) -> bool {
@@ -644,6 +710,65 @@ mod tests {
         let custom_words = vec!["hello".to_string(), "world".to_string()];
         let result = apply_custom_words(text, &custom_words, 0.5);
         assert_eq!(result, "hello world");
+    }
+
+    /// A dictionary that silently ignores every German word with an umlaut is
+    /// worse than none — it is trusted. This was the case on any non-Whisper
+    /// model, where this matcher is the only thing that runs.
+    #[test]
+    fn entries_with_umlauts_are_applied() {
+        let custom_words = vec![
+            "Grüße".to_string(),
+            "Jörg".to_string(),
+            "Größe".to_string(),
+            "Straße".to_string(),
+        ];
+
+        assert_eq!(
+            apply_custom_words("liebe gruesse", &custom_words, 0.5),
+            "liebe Grüße"
+        );
+        assert_eq!(apply_custom_words("joerg", &custom_words, 0.5), "Jörg");
+        assert_eq!(
+            apply_custom_words("die groesse", &custom_words, 0.5),
+            "die Größe"
+        );
+    }
+
+    /// An umlaut entry must still be reached by the plain spelling — that is the
+    /// common misrecognition, not the exotic one.
+    #[test]
+    fn an_umlaut_entry_catches_its_plain_spelling() {
+        let custom_words = vec!["Müller".to_string()];
+
+        assert_eq!(apply_custom_words("muller", &custom_words, 0.5), "Müller");
+        assert_eq!(apply_custom_words("mueller", &custom_words, 0.5), "Müller");
+    }
+
+    /// Chinese and Japanese stay excluded, and for a stated reason: this matcher
+    /// slices on whitespace, so a whole clause would arrive as one token and any
+    /// "similarity" would be an artefact of that.
+    #[test]
+    fn scripts_without_word_spacing_are_left_alone() {
+        assert!(!is_supported_fuzzy_key("你好世界"));
+        assert!(!is_supported_fuzzy_key("こんにちは"));
+        assert!(!is_supported_fuzzy_key("カタカナ"));
+
+        // Everything written with spaces is fair game, whatever the alphabet.
+        assert!(is_supported_fuzzy_key("grüße"));
+        assert!(is_supported_fuzzy_key("straße"));
+        assert!(is_supported_fuzzy_key("café"));
+        assert!(is_supported_fuzzy_key("naïve"));
+        assert!(is_supported_fuzzy_key("chargebee"));
+    }
+
+    /// Soundex is English phonetics and stays ASCII-only. The umlaut entries
+    /// above are matched on edit distance alone, which is the point: they no
+    /// longer need to pass a test built for another language.
+    #[test]
+    fn phonetic_scoring_stays_out_of_non_ascii_words() {
+        assert!(supports_soundex("mueller"));
+        assert!(!supports_soundex("müller"));
     }
 
     #[test]

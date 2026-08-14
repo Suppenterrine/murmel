@@ -37,8 +37,11 @@ export const ApiKeyField: React.FC<ApiKeyFieldProps> = ({
 
   const refresh = useCallback(async () => {
     try {
-      const result = await commands.hasPostProcessApiKey(providerId);
-      setHasKey(result.status === "ok" ? result.data : false);
+      // Returns the boolean directly — asking the credential store whether an
+      // entry exists cannot fail in a way worth reporting, so the command has no
+      // error arm. Unwrapping it as a Result silently yielded `false` here, and
+      // a stored key showed as none.
+      setHasKey(await commands.hasPostProcessApiKey(providerId));
     } catch {
       setHasKey(false);
     }

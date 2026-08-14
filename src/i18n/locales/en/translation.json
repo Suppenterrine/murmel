@@ -534,10 +534,10 @@
       "entryLabel": "Entry {{word}}",
       "hint": "An empty entry is dropped when saving.",
       "howTitle": "How the dictionary works",
-      "howBefore": "Murmel hands the list to the speech model before it listens. The model then expects these words and tends to spell them right on its own.",
-      "howAfter": "If something else comes out anyway, Murmel compares every word in the result against your entries — by spelling and by sound. Close enough, and it is replaced. That is why the correct entry is enough: you never have to collect the wrong variants.",
+      "howBefore": "On Whisper models the list is handed to the speech model before it listens. It then expects these words and often spells them right on its own; the comparison below is skipped in that case.",
+      "howAfter": "On every other model — and whenever a Whisper model gets it wrong anyway — Murmel compares each word in the result against your entries: by spelling, and for words without accented characters also by sound. Close enough, and it is replaced. That is why the correct entry is enough: you never have to collect the wrong variants.",
       "howPhrases": "A phrase is an entry containing spaces, such as \"Silly Tavern\". Murmel considers up to three consecutive words at a time, so \"Charge B\" becomes \"ChargeBee\" and words the recogniser split apart find each other again.",
-      "howLimits": "The sound comparison follows English pronunciation rules and only applies to entries without accented characters. That does not matter for the Whisper models — there the first route does the work."
+      "howLimits": "Accented characters are carried along: \"Grüße\" is found even when \"gruesse\" arrived. What is not supported are scripts written without spaces between words, such as Chinese or Japanese — there is no way to tell where a word ends."
     },
     "insights": {
       "title": "Insights",

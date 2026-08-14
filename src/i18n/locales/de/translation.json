@@ -534,10 +534,10 @@
       "entryLabel": "Eintrag {{word}}",
       "hint": "Ein leerer Eintrag wird beim Speichern entfernt.",
       "howTitle": "Wie das Lexikon wirkt",
-      "howBefore": "Murmel gibt dem Sprachmodell die Liste mit, bevor es zuhört. Es rechnet dann mit diesen Wörtern und schreibt sie eher von sich aus richtig.",
-      "howAfter": "Kommt trotzdem etwas anderes heraus, vergleicht Murmel jedes Wort im Ergebnis mit deinen Einträgen — nach Schreibweise und nach Klang. Liegt es nah genug, wird es ersetzt. Deshalb genügt der richtige Eintrag: die falschen Varianten musst du nicht sammeln.",
+      "howBefore": "Bei Whisper-Modellen bekommt das Sprachmodell deine Liste mit, bevor es zuhört. Es rechnet dann mit diesen Wörtern und schreibt sie oft schon von sich aus richtig. Der Abgleich danach entfällt in diesem Fall.",
+      "howAfter": "Bei allen anderen Modellen — und wenn ein Whisper-Modell trotzdem danebenliegt — vergleicht Murmel jedes Wort im Ergebnis mit deinen Einträgen: nach Schreibweise und, bei Wörtern ohne Sonderzeichen, zusätzlich nach Klang. Liegt es nah genug, wird ersetzt. Deshalb genügt der richtige Eintrag; die falschen Varianten musst du nicht sammeln.",
       "howPhrases": "Eine Wortgruppe ist ein Eintrag mit Leerzeichen, etwa „Silly Tavern\". Murmel betrachtet beim Vergleich bis zu drei aufeinanderfolgende Wörter am Stück — so wird aus „Charge B\" ein „ChargeBee\", und Wörter, die beim Diktieren auseinandergerissen wurden, finden wieder zusammen.",
-      "howLimits": "Der Klangvergleich arbeitet nach englischen Ausspracheregeln und greift nur bei Einträgen ohne Umlaute und ß. Für die Whisper-Modelle spielt das keine Rolle — dort wirkt der erste Weg."
+      "howLimits": "Umlaute und Akzente werden mitgeführt: „Grüße\" wird auch gefunden, wenn „gruesse\" ankam. Nicht unterstützt sind Schriften ohne Wortabstände wie Chinesisch oder Japanisch — dort lässt sich nicht bestimmen, wo ein Wort endet."
     },
     "insights": {
       "title": "Statistik",

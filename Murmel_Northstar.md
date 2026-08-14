@@ -337,6 +337,41 @@ Ein **Insights**-Bereich im Hauptfenster, bewusst zurückhaltend:
 
 ---
 
+## 6.4 Lexikon — welcher Weg wann greift
+
+Das Lexikon (`settings.custom_words`) wirkt über **zwei** Wege, und welcher zieht,
+hängt am geladenen Transkriptionsmodell. Das war lange undokumentiert und hat zu
+Einträgen geführt, die nachweislich nichts taten.
+
+| Modell                                             | Weg                                                                                      | Wo                                               |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| **Whisper-Familie** (`model.arch() == "whisper"`)  | Die Liste geht als `initial_prompt` in die Dekodierung. Der Abgleich danach **entfällt** | `managers/transcription.rs` (`model_is_whisper`) |
+| **Alle anderen** (Parakeet, Nemotron, Moonshine …) | Nachträglicher unscharfer Abgleich über Levenshtein und — nur bei ASCII — Soundex        | `audio_toolkit/text.rs` (`apply_custom_words`)   |
+
+Die Fallunterscheidung hängt bewusst an der **Architektur**, nicht am Feature-Flag
+`InitialPrompt`: Nicht-Whisper-Architekturen melden das Feature teils, lehnen die
+Whisper-Run-Extension aber mit `INVALID_ARG` ab (Upstream #1601).
+
+**Was der Abgleich kann und was nicht:**
+
+- **Sonderzeichen ja.** Jeder Eintrag bekommt einen zweiten Schlüssel ohne
+  Diakritika (`transliterate`), weil ein Erkenner „Grüße" selten falsch als
+  „Grüsse" ausgibt, sondern als „gruesse" — vom Original vier Editierschritte
+  entfernt, von der Transliteration einen. Bis 0.16.0 galt eine reine
+  ASCII-Sperre, die jeden deutschen Umlaut-Eintrag **stillschweigend wirkungslos**
+  machte, sofern kein Whisper-Modell lief.
+- **Wortgruppen ja.** Verglichen wird über N-Gramme bis zu drei Wörtern, deshalb
+  findet „Charge B" zu „ChargeBee".
+- **Klangvergleich nur ASCII.** Soundex ist englische Phonetik; nicht-lateinische
+  oder akzentuierte Formen bekommen keinen phonetischen Bonus, sondern werden
+  allein über die Editierdistanz beurteilt — der transliterierte Zweitschlüssel
+  ist ASCII und profitiert wieder davon.
+- **Schriften ohne Wortabstände nein.** Chinesisch und Japanisch sind
+  ausgeschlossen (`is_scriptio_continua`): Der Abgleich zerlegt an Leerzeichen,
+  also käme dort ein ganzer Satz als ein Token an.
+
+---
+
 ## 7. Systemintegration
 
 ### 7.1 Globale Hotkeys
