@@ -595,24 +595,32 @@ Erst angehen, wenn Windows und Ubuntu wirklich rundlaufen.
       und **dann** einen Default festlegen — jetzt datengestützt möglich,
       braucht aber Nutzungsdaten über mehrere Tage
 
-### Phase 2: Murmel wird Murmel
+### Phase 2: Murmel wird Murmel ✅
 
 - [x] Lokales LLM (Ollama) als Default-Provider für die Nachbearbeitung —
-      eigener Anbieter mit Erreichbarkeitsprüfung, nicht mehr als „Custom"
-      getarnt
+      eigener Anbieter mit Erreichbarkeitsprüfung, startbar und beendbar aus
+      der Oberfläche, nicht mehr als „Custom" getarnt
 - [x] Prompt-Presets statt freiem Textfeld (§5.2)
 - [x] Deutliche UI-Kennzeichnung, wenn ein Cloud-Provider aktiv ist — als
       lokal gilt nur Loopback, ein Ollama im Heimnetz wird als „verlässt den
       Rechner" gekennzeichnet
 - [x] History-Migration um Metrik-Spalten erweitern (§6.2) — plus eigene
       Tabelle `post_process_runs` für die Veredelungsläufe (§9)
-- [x] UI-Reduktion: i18n auf DE/EN (§4.2). Onboarding eindampfen steht noch aus
-- [ ] Insights-Ansicht: Wörter, Zeitersparnis, Modell-Performance (§6.3) —
-      wartet bewusst auf Nutzungsdaten, die sich seit 0.11.0 ansammeln
-- [ ] Startseite als eigener Tab: Bildmarke, kurzer Text, was die App tut
-- [ ] Release-Notes-Archiv in der App — repariert nebenbei, dass eine
+- [x] UI-Reduktion: i18n auf DE/EN (§4.2)
+- [x] Insights-Ansicht: Wörter, Zeitersparnis, Modell-Performance (§6.3),
+      inklusive Export als JSON/CSV und Zurücksetzen ohne Verlust der Historie
+- [x] Startseite als eigener Tab: Bildmarke, kurzer Text, was die App tut
+- [x] Release-Notes-Archiv in der App — repariert nebenbei, dass eine
       übersprungene Version nie wieder sichtbar wird
-- [ ] Volltextsuche über die Historie (`fts5`) mit Favoriten-Umschalter
+- [x] Volltextsuche über die Historie (`fts5`) mit Favoriten-Umschalter
+- [x] Modellauswahl für beide Modellarten unter „Modelle", bei
+      OpenRouter-Modellen mit Kosten **je Diktat** statt je Million Tokens
+- [x] API-Schlüssel im Schlüsselbund des Betriebssystems statt im Klartext (§5.1)
+
+**Noch offen aus dieser Phase:** Das Onboarding ist unangetastet. Es stammt
+aus dem Fork, führt durch Modellauswahl und Berechtigungen und ist damit
+länger als nötig — aber es funktioniert, und ein Ein-Personen-Projekt sieht
+es genau einmal.
 
 ### Phase 3: Ubuntu 24.04
 
@@ -631,7 +639,11 @@ Erst angehen, wenn Windows und Ubuntu wirklich rundlaufen.
 ### Irgendwann, vielleicht
 
 - [ ] Sprachbefehle („Neuer Absatz", „Punkt", „Komma")
-- [ ] Export der Statistiken als JSON/CSV
+- [ ] **Command Mode** — markierten Text per Sprache umschreiben lassen
+      („kürzer", „förmlicher"). Das Datenmodell trägt es bereits:
+      `post_process_runs` erlaubt mehrere Läufe je Diktat, und `input_text`
+      hält fest, was das Modell tatsächlich bekam (§9)
+- [ ] Onboarding eindampfen (§4.2 Schritt 1, letzter offener Punkt)
 
 ---
 
