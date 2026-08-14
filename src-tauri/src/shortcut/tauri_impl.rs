@@ -23,8 +23,8 @@ pub fn init_shortcuts(app: &AppHandle) {
         if id == "cancel" {
             continue; // Skip cancel shortcut, it will be registered dynamically
         }
-        // Skip post-processing shortcut when the feature is disabled
-        if id == "transcribe_with_post_process" && !user_settings.post_process_enabled {
+        // Skip shortcuts that would run into a language model that is switched off
+        if super::is_inert(&id, &user_settings) {
             continue;
         }
         let binding = user_settings

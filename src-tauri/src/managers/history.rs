@@ -307,7 +307,6 @@ impl EntryKind {
             _ => EntryKind::Dictation,
         }
     }
-
 }
 
 /// Words dictated on one calendar day, local time.
@@ -1881,7 +1880,12 @@ mod tests {
     #[test]
     fn rewrites_do_not_count_as_dictations() {
         let conn = setup_conn();
-        insert_entry(&conn, 100, "ein ordentlich langes diktat mit sechs woertern", None);
+        insert_entry(
+            &conn,
+            100,
+            "ein ordentlich langes diktat mit sechs woertern",
+            None,
+        );
         insert_rewrite(&conn, 200, EntryKind::Command, "kuerzer");
         insert_rewrite(&conn, 300, EntryKind::Rewrite, "irgendein markierter text");
 
@@ -1889,7 +1893,10 @@ mod tests {
 
         assert_eq!(summary.dictations, 1);
         assert_eq!(summary.words, 7, "only the dictated words are counted");
-        assert_eq!(summary.duration_ms, 4200, "only the dictation's speaking time");
+        assert_eq!(
+            summary.duration_ms, 4200,
+            "only the dictation's speaking time"
+        );
         assert_eq!(summary.rewrites, 2);
         assert_eq!(summary.spoken_commands, 1);
     }

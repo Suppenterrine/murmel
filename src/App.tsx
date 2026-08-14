@@ -162,6 +162,19 @@ function App() {
     };
   }, [t]);
 
+  // The rewrite hotkey has no window of its own, so a failure has nowhere else
+  // to show up — without this it looks like the key was never registered.
+  useEffect(() => {
+    const unlisten = listen<string>("rewrite-error", (event) => {
+      toast.error(t("errors.rewriteFailedTitle"), {
+        description: event.payload,
+      });
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [t]);
+
   // Listen for paste failures and show a toast.
   // The technical error detail is logged to murmel.log on the Rust side
   // (see actions.rs `error!("Failed to paste transcription: ...")`),

@@ -160,9 +160,16 @@ fn should_use_streaming_overlay(style: OverlayStyle, is_streaming: bool) -> bool
 /// - `Err(reason)` — a run was attempted and failed. This *is* worth recording:
 ///   the share of attempts that fail is what tells you whether a local model is
 ///   dependable, and collapsing it into `None` makes that unknowable.
+///
+/// `prompt_id` is passed in rather than read from the settings: dictation and
+/// the rewrite hotkey share provider, model and machinery but not the prompt —
+/// "tidy up what I just said" and "turn this selection into an email" are
+/// different jobs, and tying them to one selection would force a choice nobody
+/// wants to make.
 async fn post_process_transcription(
     settings: &AppSettings,
     transcription: &str,
+    prompt_id: Option<&str>,
 ) -> std::result::Result<Option<String>, String> {
     if is_blank_transcription(transcription) {
         debug!("Post-processing skipped because the transcription is empty");
@@ -191,8 +198,8 @@ async fn post_process_transcription(
         return Ok(None);
     }
 
-    let selected_prompt_id = match &settings.post_process_selected_prompt_id {
-        Some(id) => id.clone(),
+    let selected_prompt_id = match prompt_id {
+        Some(id) => id.to_string(),
         None => {
             debug!("Post-processing skipped because no prompt is selected");
             return Ok(None);
@@ -507,8 +514,10 @@ pub(crate) async fn process_transcription_output(
     }
 
     if post_process {
+        let prompt_id = settings.post_process_selected_prompt_id.clone();
         let started = Instant::now();
-        let outcome = post_process_transcription(&settings, &final_text).await;
+        let outcome =
+            post_process_transcription(&settings, &final_text, prompt_id.as_deref()).await;
         let duration_ms = Some(started.elapsed().as_millis() as i64);
 
         // Skips leave `run` untouched; only an actual attempt is recorded, and
@@ -518,6 +527,7 @@ pub(crate) async fn process_transcription_output(
             Ok(Some(processed_text)) => {
                 runs.push(build_llm_run(
                     &settings,
+                    prompt_id,
                     final_text.clone(),
                     Some(processed_text.clone()),
                     duration_ms,
@@ -528,6 +538,7 @@ pub(crate) async fn process_transcription_output(
             Err(reason) => {
                 runs.push(build_llm_run(
                     &settings,
+                    prompt_id,
                     final_text.clone(),
                     None,
                     duration_ms,
@@ -557,13 +568,13 @@ fn samples_to_ms(sample_count: usize) -> i64 {
 /// to the prompt does not rewrite the history of what was actually sent.
 fn build_llm_run(
     settings: &AppSettings,
+    prompt_id: Option<String>,
     input_text: String,
     output_text: Option<String>,
     duration_ms: Option<i64>,
     error: Option<String>,
 ) -> NewPostProcessRun {
     let provider_id = settings.post_process_provider_id.clone();
-    let prompt_id = settings.post_process_selected_prompt_id.clone();
     let prompt_text = prompt_id.as_ref().and_then(|id| {
         settings
             .post_process_prompts
@@ -1047,6 +1058,142 @@ impl ShortcutAction for TestAction {
 }
 
 // Static Action Map
+/// Rewrite whatever the user has selected, wherever they selected it.
+///
+/// No microphone: the instruction is the configured prompt, so a single press
+/// is the whole interaction. The result replaces the selection — pasting over a
+/// selection is what every text field already does, so nothing has to be
+/// deleted first, and the target application's own undo puts the original back.
+struct RewriteSelectionAction;
+
+impl ShortcutAction for RewriteSelectionAction {
+    fn start(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            // The overlay is the only sign that anything is happening; a local
+            // model takes seconds, and without it the key press looks ignored.
+            show_processing_overlay(&app);
+            change_tray_icon(&app, TrayIconState::Transcribing);
+
+            let outcome = rewrite_selection(&app).await;
+
+            utils::hide_recording_overlay(&app);
+            change_tray_icon(&app, TrayIconState::Idle);
+
+            match outcome {
+                Ok(()) => debug!("Selection rewritten"),
+                Err(err) => {
+                    warn!("Could not rewrite the selection: {err}");
+                    let _ = app.emit("rewrite-error", err);
+                }
+            }
+        });
+    }
+
+    fn stop(&self, _app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {}
+}
+
+/// Read the selection, run it through the configured prompt, paste the result.
+///
+/// Errors are returned rather than swallowed at every step: this hotkey has no
+/// visible state of its own, so a silent failure is indistinguishable from a
+/// key that was never registered.
+async fn rewrite_selection(app: &AppHandle) -> Result<(), String> {
+    let settings = get_settings(app);
+
+    // Checked before touching the clipboard: without a model there is nothing
+    // to do, and borrowing the clipboard to find that out would be rude.
+    if settings.active_post_process_provider().is_none() {
+        return Err("No language model is configured for rewriting.".to_string());
+    }
+
+    let selection = crate::clipboard::read_selection(app).await?;
+    if selection.trim().is_empty() {
+        return Err("Nothing was selected.".to_string());
+    }
+
+    let prompt_id = settings.rewrite_prompt_id.clone();
+    let started = Instant::now();
+    let outcome = post_process_transcription(&settings, &selection, prompt_id.as_deref()).await;
+    let duration_ms = Some(started.elapsed().as_millis() as i64);
+
+    let rewritten = match outcome {
+        Ok(Some(text)) => text,
+        // Nothing ran — the configuration is incomplete in a way the provider
+        // check above does not cover (no model, no prompt).
+        Ok(None) => {
+            return Err("Rewriting is not fully configured yet.".to_string());
+        }
+        Err(reason) => {
+            // Recorded even though it failed, for the same reason a failed
+            // refinement is: the share that fails is what says whether a local
+            // model is dependable.
+            save_rewrite(app, &selection, None, duration_ms, prompt_id, Some(&reason));
+            return Err(reason);
+        }
+    };
+
+    save_rewrite(
+        app,
+        &selection,
+        Some(&rewritten),
+        duration_ms,
+        prompt_id,
+        None,
+    );
+
+    // Back to the main thread: key injection and clipboard access are the same
+    // constraint the dictation paste path observes.
+    let handle = app.clone();
+    let text = rewritten;
+    app.run_on_main_thread(move || {
+        if let Err(err) = utils::paste(text, handle.clone()) {
+            error!("Failed to paste the rewritten selection: {}", err);
+            let _ = handle.emit("paste-error", ());
+        }
+    })
+    .map_err(|err| format!("Could not paste the result: {err}"))?;
+
+    Ok(())
+}
+
+/// Record a rewrite the way a dictation is recorded, minus the recording.
+///
+/// The entry carries the text that went in; the run carries both sides. That
+/// keeps the original recoverable after the paste has overwritten it — the
+/// history is the second way back, next to the target application's undo.
+fn save_rewrite(
+    app: &AppHandle,
+    input: &str,
+    output: Option<&str>,
+    duration_ms: Option<i64>,
+    prompt_id: Option<String>,
+    error: Option<&str>,
+) {
+    let settings = get_settings(app);
+    let run = build_llm_run(
+        &settings,
+        prompt_id,
+        input.to_string(),
+        output.map(str::to_string),
+        duration_ms,
+        error.map(str::to_string),
+    );
+
+    let history = app.state::<Arc<HistoryManager>>();
+    if let Err(err) = history.save_entry(NewHistoryEntry {
+        // No recording: nothing was spoken.
+        file_name: String::new(),
+        transcription_text: input.to_string(),
+        post_process_requested: true,
+        kind: EntryKind::Rewrite,
+        post_process: vec![run],
+        ..Default::default()
+    }) {
+        error!("Failed to save the rewrite to the history: {}", err);
+    }
+}
+
 /// Teach the dictionary from a correction made in the target application.
 ///
 /// The user fixes a word wherever the text landed, selects the result and
@@ -1131,6 +1278,10 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
         Arc::new(CancelAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(
+        "rewrite_selection".to_string(),
+        Arc::new(RewriteSelectionAction) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
         "capture_correction".to_string(),
         Arc::new(CaptureCorrectionAction) as Arc<dyn ShortcutAction>,
     );
@@ -1144,15 +1295,117 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
 #[cfg(test)]
 mod tests {
     use super::{
-        complete_unless_cancelled, is_blank_transcription, should_use_streaming_overlay,
-        strip_think_block,
+        build_llm_run, complete_unless_cancelled, is_blank_transcription,
+        should_use_streaming_overlay, strip_think_block,
     };
-    use crate::settings::OverlayStyle;
+    use crate::settings::{get_default_settings, OverlayStyle, TIDY_PRESET_ID};
     use std::future;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
+
+    /// The rewrite hotkey records which prompt it ran under, not whichever one
+    /// dictation happens to be set to. Without the prompt id threaded through,
+    /// both would claim the dictation prompt and the history would describe a
+    /// run that never happened.
+    #[test]
+    fn a_run_records_the_prompt_it_was_given() {
+        let mut settings = get_default_settings();
+        settings.post_process_selected_prompt_id = Some("preset_email".to_string());
+
+        let run = build_llm_run(
+            &settings,
+            Some(TIDY_PRESET_ID.to_string()),
+            "input".to_string(),
+            Some("output".to_string()),
+            Some(120),
+            None,
+        );
+
+        assert_eq!(run.prompt_id.as_deref(), Some(TIDY_PRESET_ID));
+        assert!(
+            run.prompt_text
+                .as_deref()
+                .is_some_and(|text| text.contains("Tidy up")),
+            "the prompt text is copied so a later edit cannot rewrite history"
+        );
+        assert!(run.succeeded);
+    }
+
+    /// A failed run keeps its reason and is still recorded — the share that
+    /// fails is what says whether a local model is dependable.
+    #[test]
+    fn a_failed_run_keeps_its_reason() {
+        let settings = get_default_settings();
+
+        let run = build_llm_run(
+            &settings,
+            Some(TIDY_PRESET_ID.to_string()),
+            "input".to_string(),
+            None,
+            Some(90),
+            Some("connection refused".to_string()),
+        );
+
+        assert!(!run.succeeded);
+        assert_eq!(run.error.as_deref(), Some("connection refused"));
+        assert_eq!(run.input_text, "input");
+    }
+
+    /// The rewrite hotkey is pointless without a language model and must not
+    /// hold a global shortcut hostage while refinement is switched off.
+    #[test]
+    fn hotkeys_needing_a_model_stay_unregistered_while_it_is_off() {
+        let mut settings = get_default_settings();
+        settings.post_process_enabled = false;
+
+        assert!(crate::shortcut::is_inert("rewrite_selection", &settings));
+        assert!(crate::shortcut::is_inert(
+            "transcribe_with_post_process",
+            &settings
+        ));
+        assert!(!crate::shortcut::is_inert("transcribe", &settings));
+
+        settings.post_process_enabled = true;
+        assert!(!crate::shortcut::is_inert("rewrite_selection", &settings));
+    }
+
+    /// Shipped bound, unlike the dictionary hotkey: that one has a second route
+    /// through the history, this one has no way in at all without a key.
+    #[test]
+    fn the_rewrite_hotkey_ships_with_a_binding() {
+        let settings = get_default_settings();
+        let binding = settings
+            .bindings
+            .get("rewrite_selection")
+            .expect("rewrite binding exists");
+
+        assert!(!binding.current_binding.is_empty());
+        assert!(settings.bindings.contains_key("capture_correction"));
+        assert!(
+            settings.bindings["capture_correction"]
+                .current_binding
+                .is_empty(),
+            "the dictionary hotkey stays unbound — the history covers it"
+        );
+    }
+
+    /// Tidying is the only preset that promises to leave the content alone.
+    /// Turning a marked paragraph into an email unasked would be a surprise.
+    #[test]
+    fn rewriting_defaults_to_the_cleanup_preset() {
+        let settings = get_default_settings();
+
+        assert_eq!(settings.rewrite_prompt_id.as_deref(), Some(TIDY_PRESET_ID));
+        assert!(
+            settings
+                .post_process_prompts
+                .iter()
+                .any(|prompt| prompt.id == TIDY_PRESET_ID),
+            "the default must name a prompt that actually exists"
+        );
+    }
 
     #[test]
     fn blank_transcription_is_detected() {

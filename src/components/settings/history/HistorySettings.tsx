@@ -391,6 +391,9 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   const [retrying, setRetrying] = useState(false);
 
   const hasTranscription = entry.transcription_text.trim().length > 0;
+  // A rewrite started from text that was already on screen, so there is no
+  // recording — and nothing to play or transcribe a second time.
+  const hasRecording = entry.file_name.length > 0;
 
   const handleLoadAudio = useCallback(
     () => getAudioUrl(entry.file_name),
@@ -433,7 +436,19 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
   return (
     <div className="px-4 py-2 pb-5 flex flex-col gap-3">
       <div className="flex justify-between items-center">
-        <p className="text-sm font-medium">{formattedDate}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium">{formattedDate}</p>
+          {/*
+           * Without this, "mach das kürzer" sits in the list looking like a
+           * pointless three-word dictation — the entry only makes sense once
+           * you know it acted on text somewhere else.
+           */}
+          {entry.kind !== "dictation" && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide bg-logo-primary/10 text-logo-primary">
+              {t(`settings.history.kind.${entry.kind}`)}
+            </span>
+          )}
+        </div>
         <div className="flex items-center">
           <IconButton
             onClick={handleCopyText}
@@ -462,21 +477,23 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
               fill={entry.saved ? "currentColor" : "none"}
             />
           </IconButton>
-          <IconButton
-            onClick={handleRetranscribe}
-            disabled={retrying}
-            title={t("settings.history.retranscribe")}
-          >
-            <RotateCcw
-              width={16}
-              height={16}
-              style={
-                retrying
-                  ? { animation: "spin 1s linear infinite reverse" }
-                  : undefined
-              }
-            />
-          </IconButton>
+          {hasRecording && (
+            <IconButton
+              onClick={handleRetranscribe}
+              disabled={retrying}
+              title={t("settings.history.retranscribe")}
+            >
+              <RotateCcw
+                width={16}
+                height={16}
+                style={
+                  retrying
+                    ? { animation: "spin 1s linear infinite reverse" }
+                    : undefined
+                }
+              />
+            </IconButton>
+          )}
           <IconButton
             onClick={handleDeleteEntry}
             disabled={retrying}
@@ -522,7 +539,9 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
 
       <EntryMetrics entry={entry} />
 
-      <AudioPlayer onLoadRequest={handleLoadAudio} className="w-full" />
+      {hasRecording && (
+        <AudioPlayer onLoadRequest={handleLoadAudio} className="w-full" />
+      )}
     </div>
   );
 };

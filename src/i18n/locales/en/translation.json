@@ -196,6 +196,14 @@
           "transcribe_with_post_process": {
             "name": "Post-Processing Hotkey",
             "description": "Optional: A dedicated hotkey that always applies AI post-processing to your transcription."
+          },
+          "rewrite_selection": {
+            "name": "Rewrite selection",
+            "description": "Select text in any window and press this key. Murmel runs it through the chosen instruction and replaces it with the result. Undo in the target application puts the original back."
+          },
+          "capture_correction": {
+            "name": "Capture correction",
+            "description": "Fix a word wherever the text landed, select the result and press this key. Murmel compares it with your last dictation and adds new words to the dictionary."
           }
         },
         "errors": {
@@ -414,6 +422,13 @@
       "hotkey": {
         "title": "Hotkey"
       },
+      "rewrite": {
+        "title": "Rewrite selected text",
+        "prompt": {
+          "title": "Instruction",
+          "description": "Which instruction is applied to the selected text. A separate choice, because a dictated sentence usually just wants tidying while a marked-up paragraph is often meant to become something else."
+        }
+      },
       "api": {
         "title": "API (OpenAI Compatible)",
         "provider": {
@@ -587,7 +602,11 @@
       "retranscribe": "Re-transcribe",
       "retranscribeError": "Failed to re-transcribe. Please try again.",
       "transcribing": "Transcribing...",
-      "transcriptionFailed": "Transcription failed. You can re-transcribe using the retry icon."
+      "transcriptionFailed": "Transcription failed. You can re-transcribe using the retry icon.",
+      "kind": {
+        "command": "Command",
+        "rewrite": "Rewritten"
+      }
     },
     "debug": {
       "title": "Debug",
@@ -799,7 +818,8 @@
     "modelLoadFailedUnknown": "unknown model",
     "pasteFailedTitle": "Failed to Paste Text",
     "pasteFailed": "Text could not be pasted into the active application.",
-    "transcriptionFailedTitle": "Transcription Failed"
+    "transcriptionFailedTitle": "Transcription Failed",
+    "rewriteFailedTitle": "Rewrite Failed"
   },
   "appLanguage": {
     "title": "Application Language",

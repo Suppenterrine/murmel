@@ -246,6 +246,18 @@ pub fn suspend_all_shortcuts(app: &AppHandle) {
     }
 }
 
+/// Whether a binding is pointless under the current settings and should not
+/// take a global shortcut away from the rest of the system.
+///
+/// Every hotkey that ends in a language model belongs here. The check used to
+/// be written out at each of the four registration sites, which was survivable
+/// while it covered one binding — with a second one, the fourth copy is the one
+/// that gets forgotten and the key then fires into nothing.
+pub(crate) fn is_inert(id: &str, settings: &crate::settings::AppSettings) -> bool {
+    let needs_language_model = matches!(id, "transcribe_with_post_process" | "rewrite_selection");
+    needs_language_model && !settings.post_process_enabled
+}
+
 /// Re-register every binding from settings after shortcut recording ends.
 /// Registering an already-registered shortcut fails cleanly in both
 /// implementations, so this is idempotent and safe on every exit path.
@@ -255,7 +267,7 @@ pub fn resume_all_shortcuts(app: &AppHandle) {
         if id == "cancel" {
             continue;
         }
-        if id == "transcribe_with_post_process" && !settings.post_process_enabled {
+        if is_inert(id, &settings) {
             continue;
         }
         if let Err(e) = register_shortcut(app, binding.clone()) {
@@ -446,8 +458,8 @@ fn register_all_shortcuts_for_implementation(
             continue;
         }
 
-        // Skip post-processing shortcut when the feature is disabled
-        if id == "transcribe_with_post_process" && !current_settings.post_process_enabled {
+        // Skip shortcuts that would run into a language model that is switched off
+        if is_inert(id, &current_settings) {
             continue;
         }
 
@@ -1410,6 +1422,21 @@ pub fn set_post_process_selected_prompt(app: AppHandle, id: String) -> Result<()
     }
 
     settings.post_process_selected_prompt_id = Some(id);
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+/// Which prompt the rewrite hotkey runs over a selection.
+#[tauri::command]
+#[specta::specta]
+pub fn set_rewrite_prompt(app: AppHandle, id: String) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+
+    if !settings.post_process_prompts.iter().any(|p| p.id == id) {
+        return Err(format!("Prompt with id '{}' not found", id));
+    }
+
+    settings.rewrite_prompt_id = Some(id);
     settings::write_settings(&app, settings);
     Ok(())
 }

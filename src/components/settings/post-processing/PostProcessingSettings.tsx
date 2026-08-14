@@ -427,6 +427,54 @@ export const PostProcessingSettingsPrompts = React.memo(
 );
 PostProcessingSettingsPrompts.displayName = "PostProcessingSettingsPrompts";
 
+/**
+ * Rewriting a selection: its own hotkey and its own prompt.
+ *
+ * The prompt is a separate setting from the dictation one on purpose. Dictating
+ * usually wants tidying; a marked-up paragraph is more often meant to become
+ * something else. One shared selection would turn every switch into a trade.
+ */
+const RewriteSettingsComponent: React.FC = () => {
+  const { t } = useTranslation();
+  const { getSetting, updateSetting, isUpdating } = useSettings();
+
+  const prompts = getSetting("post_process_prompts") || [];
+  const selected = (getSetting("rewrite_prompt_id") as string | null) || "";
+
+  return (
+    <>
+      <ShortcutInput
+        shortcutId="rewrite_selection"
+        descriptionMode="tooltip"
+        grouped={true}
+      />
+
+      <SettingContainer
+        title={t("settings.postProcessing.rewrite.prompt.title")}
+        description={t("settings.postProcessing.rewrite.prompt.description")}
+        descriptionMode="tooltip"
+        layout="horizontal"
+        grouped={true}
+      >
+        <Dropdown
+          selectedValue={selected || null}
+          options={prompts.map((prompt) => ({
+            value: prompt.id,
+            label: prompt.name,
+          }))}
+          onSelect={(value) => updateSetting("rewrite_prompt_id", value)}
+          placeholder={t("settings.postProcessing.prompts.selectPrompt")}
+          disabled={isUpdating("rewrite_prompt_id")}
+          className="min-w-[280px]"
+        />
+      </SettingContainer>
+    </>
+  );
+};
+
+export const RewriteSettings = React.memo(RewriteSettingsComponent);
+RewriteSettings.displayName = "RewriteSettings";
+
 export const PostProcessingSettings: React.FC = () => {
   const { t } = useTranslation();
 
@@ -438,6 +486,10 @@ export const PostProcessingSettings: React.FC = () => {
           descriptionMode="tooltip"
           grouped={true}
         />
+      </SettingsGroup>
+
+      <SettingsGroup title={t("settings.postProcessing.rewrite.title")}>
+        <RewriteSettings />
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.postProcessing.api.title")}>

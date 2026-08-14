@@ -227,6 +227,14 @@
           "transcribe_with_post_process": {
             "name": "Nachbearbeitungs-Tastenkürzel",
             "description": "Optional: Ein dediziertes Tastenkürzel, das immer die KI-Nachbearbeitung auf deine Transkription anwendet."
+          },
+          "rewrite_selection": {
+            "name": "Markierung umschreiben",
+            "description": "Markiere Text in einem beliebigen Fenster und drücke diese Taste. Murmel schickt ihn durch die gewählte Anweisung und ersetzt ihn durch das Ergebnis. Rückgängig geht im Zielprogramm mit Strg+Z."
+          },
+          "capture_correction": {
+            "name": "Korrektur übernehmen",
+            "description": "Berichtige ein Wort dort, wo der Text gelandet ist, markiere das Ergebnis und drücke diese Taste. Murmel vergleicht es mit dem letzten Diktat und nimmt neue Wörter ins Lexikon auf."
           }
         },
         "errors": {
@@ -414,6 +422,13 @@
       "hotkey": {
         "title": "Tastenkürzel"
       },
+      "rewrite": {
+        "title": "Markierten Text umschreiben",
+        "prompt": {
+          "title": "Anweisung",
+          "description": "Welche Anweisung auf den markierten Text angewandt wird. Eigene Auswahl, weil ein diktierter Satz meist nur aufgeräumt werden soll, ein markierter Absatz aber oft etwas anderes werden soll."
+        }
+      },
       "api": {
         "title": "API (OpenAI-kompatibel)",
         "provider": {
@@ -587,7 +602,11 @@
       "retranscribe": "Erneut transkribieren",
       "retranscribeError": "Erneute Transkription fehlgeschlagen. Bitte versuche es erneut.",
       "transcribing": "Transkribiere...",
-      "transcriptionFailed": "Transkription fehlgeschlagen. Du kannst über das Wiederholen-Symbol erneut transkribieren."
+      "transcriptionFailed": "Transkription fehlgeschlagen. Du kannst über das Wiederholen-Symbol erneut transkribieren.",
+      "kind": {
+        "command": "Befehl",
+        "rewrite": "Umgeschrieben"
+      }
     },
     "debug": {
       "title": "Debug",
@@ -796,7 +815,8 @@
     "modelLoadFailedUnknown": "unbekanntes Modell",
     "pasteFailedTitle": "Text konnte nicht eingefügt werden",
     "pasteFailed": "Der Text konnte nicht in die aktive Anwendung eingefügt werden.",
-    "transcriptionFailedTitle": "Transkription fehlgeschlagen"
+    "transcriptionFailedTitle": "Transkription fehlgeschlagen",
+    "rewriteFailedTitle": "Umschreiben fehlgeschlagen"
   },
   "appLanguage": {
     "title": "Anwendungssprache",
