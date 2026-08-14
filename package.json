@@ -1,7 +1,6 @@
 {
   "name": "murmel-app",
   "private": true,
-  "version": "0.16.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -14,12 +14,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Get version from tauri.conf.json
+      # The one place a version number lives. tauri.conf.json has no `version`
+      # field on purpose — Tauri falls back to this one, so `cargo set-version`
+      # is the only step in a version bump and nothing can drift out of step.
+      - name: Get version from Cargo.toml
         id: get-version
         shell: bash
         run: |
-          VERSION=$(grep -o '"version": "[^"]*"' src-tauri/tauri.conf.json | cut -d'"' -f4)
-          echo "Application version from tauri.conf.json: $VERSION"
+          VERSION=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
+          if [ -z "$VERSION" ]; then
+            echo "::error::No version found in src-tauri/Cargo.toml"
+            exit 1
+          fi
+          echo "Application version from Cargo.toml: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create Draft Release

@@ -78,12 +78,18 @@ jobs:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
 
-      - name: Get version from tauri.conf.json
+      # Cargo.toml is where the version lives; tauri.conf.json has no `version`
+      # field so that `cargo set-version` is the whole bump. See release.yml.
+      - name: Get version from Cargo.toml
         id: get-version
         shell: bash
         run: |
-          VERSION=$(grep -o '"version": "[^"]*"' src-tauri/tauri.conf.json | cut -d'"' -f4)
-          echo "Application version from tauri.conf.json: $VERSION"
+          VERSION=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
+          if [ -z "$VERSION" ]; then
+            echo "::error::No version found in src-tauri/Cargo.toml"
+            exit 1
+          fi
+          echo "Application version from Cargo.toml: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Determine build profile

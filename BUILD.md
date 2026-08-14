@@ -157,19 +157,27 @@ Cutting a release means running the **Release** workflow
 (`.github/workflows/release.yml`, `workflow_dispatch`). Two steps around it are
 easy to miss, and both fail _silently_ — the app simply never sees an update:
 
-1. **Bump the version first.** The workflow reads it out of
-   `src-tauri/tauri.conf.json` and derives the git tag `v<version>` from it. If
-   it still says the shipped version, the release collides with the existing
-   tag. Three files carry the version, and each has a tool that knows its
-   format — **never edit them by hand**, least of all with `sed`:
+1. **Bump the version first.** One command, one file:
 
    ```bash
-   cd src-tauri && cargo set-version 0.16.0   # Cargo.toml + Cargo.lock
-   bun pm version 0.16.0 --no-git-tag-version --allow-dirty   # package.json
+   cd src-tauri && cargo set-version 0.17.0
    ```
 
-   `src-tauri/tauri.conf.json` — the one the workflow actually reads — has no
-   such tool, so it is the one file edited directly.
+   That is the whole step. `src-tauri/Cargo.toml` is the only place a version
+   number lives; the workflow reads it from there and derives the git tag
+   `v<version>`. If it still says the shipped version, the release collides with
+   the existing tag.
+
+   **Never edit a version by hand** — not with an editor, and certainly not with
+   `sed`. There is nothing to edit: `tauri.conf.json` deliberately has no
+   `version` field (Tauri falls back to `Cargo.toml`), and `package.json` has
+   none either — it is a private package and nothing reads its version. The app
+   shows its own version through Tauri's `getVersion()`, which comes from the
+   same single source.
+
+   This used to be three files kept in step by hand, which is exactly the kind
+   of bookkeeping that eventually forgets one — and a release whose versions
+   disagree only shows itself in the updater.
 
 2. **Nothing — publishing is automatic.** The workflow still creates a draft,
    but a final job (`publish-release`) releases it once every build has
