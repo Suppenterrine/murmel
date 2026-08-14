@@ -385,7 +385,7 @@ pub fn copy_last_transcript(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::{last_transcript_text, load_tray_icon};
-    use crate::managers::history::{HistoryEntry, PostProcessRun};
+    use crate::managers::history::{EntryKind, HistoryEntry, PostProcessRun};
 
     fn build_entry(transcription: &str, post_processed: Option<&str>) -> HistoryEntry {
         HistoryEntry {
@@ -396,6 +396,7 @@ mod tests {
             title: "Recording".to_string(),
             transcription_text: transcription.to_string(),
             post_process_requested: post_processed.is_some(),
+            kind: EntryKind::Dictation,
             duration_ms: None,
             word_count: None,
             processing_ms: None,

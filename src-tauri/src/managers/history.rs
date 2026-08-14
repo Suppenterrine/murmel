@@ -161,7 +161,34 @@ static MIGRATIONS: &[M] = &[
             VALUES (new.id, new.transcription_text);
         END;",
     ),
+    // Not every entry is a dictation any more: text that already existed
+    // somewhere can be rewritten, either through a spoken instruction or by
+    // running a preset over a selection.
+    //
+    // The column is added to *both* tables on purpose. `usage_stats` outlives
+    // the transcript it describes (see the migration above), so it has to know
+    // its own kind rather than read it from a row that may already be gone.
+    //
+    // Everything recorded so far was dictated, so the default is right
+    // retroactively and no backfill is needed.
+    M::up(
+        "ALTER TABLE transcription_history ADD COLUMN kind TEXT NOT NULL DEFAULT 'dictation';
+         ALTER TABLE usage_stats ADD COLUMN kind TEXT NOT NULL DEFAULT 'dictation';",
+    ),
 ];
+
+/// Where an entry's recording lives, or `None` when it has none.
+///
+/// A rewrite starts from text that was already on screen, so there is nothing to
+/// record and `file_name` is empty. That empty name must not be joined onto the
+/// recordings directory: the result is the directory itself, which exists — so
+/// an `exists()` check waves it through to `remove_file` or to the audio player.
+fn recording_path(recordings_dir: &std::path::Path, file_name: &str) -> Option<PathBuf> {
+    if file_name.is_empty() {
+        return None;
+    }
+    Some(recordings_dir.join(file_name))
+}
 
 /// Provider id recorded for the Chinese-variant conversion, which is a text
 /// transformation but not an LLM call. Keeping it in the same table means the
@@ -179,7 +206,7 @@ pub const OPENCC_PROVIDER_ID: &str = "opencc";
 /// join and the mapper would silently read the wrong one.
 const ENTRY_SELECT: &str = "SELECT
         h.id, h.file_name, h.timestamp, h.saved, h.title, h.transcription_text,
-        h.post_process_requested,
+        h.post_process_requested, h.kind,
         s.duration_ms, s.word_count, s.processing_ms, s.model_used, s.language,
         r.id AS pp_id,
         r.timestamp AS pp_timestamp,
@@ -244,6 +271,45 @@ pub struct PostProcessRun {
     pub error: Option<String>,
 }
 
+/// What produced an entry.
+///
+/// Stored as text rather than an integer so the database stays readable without
+/// a lookup table, and so an unknown value from a newer version degrades to
+/// "treat it as a dictation" instead of silently meaning something else.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum EntryKind {
+    /// Spoken from scratch. Everything before 0.17.0 is this.
+    #[default]
+    Dictation,
+    /// Existing text, rewritten according to a spoken instruction. The
+    /// transcript is the *instruction*, not the result.
+    Command,
+    /// Existing text, run through a preset without speaking.
+    Rewrite,
+}
+
+impl EntryKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            EntryKind::Dictation => "dictation",
+            EntryKind::Command => "command",
+            EntryKind::Rewrite => "rewrite",
+        }
+    }
+
+    /// Anything unrecognised counts as a dictation — a row written by a future
+    /// version should still show up in the history rather than fail the query.
+    fn from_str(value: &str) -> Self {
+        match value {
+            "command" => EntryKind::Command,
+            "rewrite" => EntryKind::Rewrite,
+            _ => EntryKind::Dictation,
+        }
+    }
+
+}
+
 /// Words dictated on one calendar day, local time.
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct DailyWords {
@@ -280,12 +346,18 @@ pub struct UsageSummary {
     /// Up to 30 days, oldest first.
     pub per_day: Vec<DailyWords>,
     pub models: Vec<ModelUsage>,
+    /// Existing text that was rewritten rather than dictated. Counted apart
+    /// from every number above, which all describe dictating.
+    pub rewrites: i64,
+    /// Of those, the ones steered by a spoken instruction (Command Mode).
+    pub spoken_commands: i64,
 }
 
 /// One statistics row, for export.
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct UsageRow {
     pub timestamp: i64,
+    pub kind: EntryKind,
     pub duration_ms: Option<i64>,
     pub word_count: Option<i64>,
     pub processing_ms: Option<i64>,
@@ -305,9 +377,15 @@ pub struct UsageRow {
 /// are quietly wrong forever.
 #[derive(Clone, Debug, Default)]
 pub struct NewHistoryEntry {
+    /// Empty when there is no recording — a rewrite starts from text that was
+    /// already on screen, so there is nothing to save as audio.
     pub file_name: String,
+    /// For a dictation and a rewrite this is the text itself; for a Command Mode
+    /// entry it is the spoken *instruction*, and the text it applied to is in
+    /// the refinement run's `input_text`.
     pub transcription_text: String,
     pub post_process_requested: bool,
+    pub kind: EntryKind,
     /// Length of the recorded audio.
     pub duration_ms: Option<i64>,
     /// Words in the *raw* transcript. Counting the refined text instead would
@@ -360,6 +438,10 @@ pub struct HistoryEntry {
     /// Whether refinement was *asked for* (which hotkey was pressed) — a
     /// property of the dictation, unlike the runs themselves.
     pub post_process_requested: bool,
+    /// What produced this entry. The history shows dictations and rewrites side
+    /// by side, and without this "make it shorter" reads like a pointless
+    /// three-word dictation.
+    pub kind: EntryKind,
     pub duration_ms: Option<i64>,
     pub word_count: Option<i64>,
     pub processing_ms: Option<i64>,
@@ -554,6 +636,7 @@ impl HistoryManager {
             title: row.get("title")?,
             transcription_text: row.get("transcription_text")?,
             post_process_requested: row.get("post_process_requested")?,
+            kind: EntryKind::from_str(&row.get::<_, String>("kind")?),
             duration_ms: row.get("duration_ms")?,
             word_count: row.get("word_count")?,
             processing_ms: row.get("processing_ms")?,
@@ -586,8 +669,9 @@ impl HistoryManager {
                 saved,
                 title,
                 transcription_text,
-                post_process_requested
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                post_process_requested,
+                kind
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 &new_entry.file_name,
                 timestamp,
@@ -595,6 +679,7 @@ impl HistoryManager {
                 &title,
                 &new_entry.transcription_text,
                 new_entry.post_process_requested,
+                new_entry.kind.as_str(),
             ],
         )?;
         let id = tx.last_insert_rowid();
@@ -620,6 +705,7 @@ impl HistoryManager {
             title,
             transcription_text: new_entry.transcription_text,
             post_process_requested: new_entry.post_process_requested,
+            kind: new_entry.kind,
             duration_ms: new_entry.duration_ms,
             word_count: new_entry.word_count,
             processing_ms: new_entry.processing_ms,
@@ -659,14 +745,15 @@ impl HistoryManager {
     ) -> Result<()> {
         conn.execute(
             "INSERT INTO usage_stats (
-                history_id, timestamp, duration_ms, word_count, processing_ms,
+                history_id, timestamp, kind, duration_ms, word_count, processing_ms,
                 model_used, language, post_process_requested,
                 post_process_provider, post_process_model, post_process_ms,
                 post_process_succeeded
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 history_id,
                 timestamp,
+                entry.kind.as_str(),
                 entry.duration_ms,
                 entry.word_count,
                 entry.processing_ms,
@@ -863,8 +950,10 @@ impl HistoryManager {
                 params![id],
             )?;
 
-            // Delete WAV file
-            let file_path = self.recordings_dir.join(file_name);
+            // Delete WAV file, if this entry has one at all.
+            let Some(file_path) = recording_path(&self.recordings_dir, file_name) else {
+                continue;
+            };
             if file_path.exists() {
                 if let Err(e) = fs::remove_file(&file_path) {
                     error!("Failed to delete WAV file {}: {}", file_name, e);
@@ -1001,7 +1090,17 @@ impl HistoryManager {
     /// would put the arithmetic somewhere it cannot be tested.
     pub fn usage_summary(&self, typing_wpm: f64) -> Result<UsageSummary> {
         let conn = self.get_connection()?;
+        Self::usage_summary_with_conn(&conn, typing_wpm)
+    }
 
+    /// The arithmetic, separated from where the connection comes from — the
+    /// tests can then check the aggregates against a database they built,
+    /// rather than restating the same SQL and proving nothing.
+    fn usage_summary_with_conn(conn: &Connection, typing_wpm: f64) -> Result<UsageSummary> {
+        // Every aggregate below is about dictating, so each one restricts itself
+        // to dictations. Rewrites are counted separately at the end — mixing
+        // them in would make a three-word instruction weigh as much as a
+        // paragraph in words per day, speaking rate and time saved.
         let (dictations, words, duration_ms, processing_ms): (i64, i64, i64, i64) = conn
             .query_row(
                 "SELECT
@@ -1009,21 +1108,34 @@ impl HistoryManager {
                     COALESCE(SUM(word_count), 0),
                     COALESCE(SUM(duration_ms), 0),
                     COALESCE(SUM(processing_ms), 0)
-                 FROM usage_stats",
+                 FROM usage_stats
+                 WHERE kind = 'dictation'",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )?;
 
         let refined: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM usage_stats WHERE post_process_succeeded = 1",
+            "SELECT COUNT(*) FROM usage_stats
+             WHERE kind = 'dictation' AND post_process_succeeded = 1",
             [],
             |row| row.get(0),
         )?;
 
         let refinement_failures: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM usage_stats WHERE post_process_succeeded = 0",
+            "SELECT COUNT(*) FROM usage_stats
+             WHERE kind = 'dictation' AND post_process_succeeded = 0",
             [],
             |row| row.get(0),
+        )?;
+
+        let (rewrites, spoken_commands): (i64, i64) = conn.query_row(
+            "SELECT
+                COUNT(*),
+                COALESCE(SUM(kind = 'command'), 0)
+             FROM usage_stats
+             WHERE kind IN ('command', 'rewrite')",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )?;
 
         // Local time, not UTC: "which day did I dictate this" is a question
@@ -1033,6 +1145,7 @@ impl HistoryManager {
             "SELECT date(timestamp, 'unixepoch', 'localtime') AS day,
                     COALESCE(SUM(word_count), 0)
              FROM usage_stats
+             WHERE kind = 'dictation'
              GROUP BY day
              ORDER BY day DESC
              LIMIT 30",
@@ -1051,6 +1164,7 @@ impl HistoryManager {
             "SELECT CAST(strftime('%H', timestamp, 'unixepoch', 'localtime') AS INTEGER),
                     COUNT(*)
              FROM usage_stats
+             WHERE kind = 'dictation'
              GROUP BY 1
              ORDER BY 2 DESC, 1 ASC
              LIMIT 1",
@@ -1063,7 +1177,7 @@ impl HistoryManager {
         let mut stmt = conn.prepare(
             "SELECT model_used, COUNT(*), COALESCE(AVG(processing_ms), 0)
              FROM usage_stats
-             WHERE model_used IS NOT NULL AND model_used != ''
+             WHERE kind = 'dictation' AND model_used IS NOT NULL AND model_used != ''
              GROUP BY model_used
              ORDER BY 2 DESC",
         )?;
@@ -1099,6 +1213,8 @@ impl HistoryManager {
             busiest_hour,
             per_day,
             models,
+            rewrites,
+            spoken_commands,
         })
     }
 
@@ -1107,27 +1223,30 @@ impl HistoryManager {
     pub fn usage_rows(&self) -> Result<Vec<UsageRow>> {
         let conn = self.get_connection()?;
         let mut stmt = conn.prepare(
-            "SELECT timestamp, duration_ms, word_count, processing_ms, model_used,
+            "SELECT timestamp, kind, duration_ms, word_count, processing_ms, model_used,
                     language, post_process_requested, post_process_provider,
                     post_process_model, post_process_ms, post_process_succeeded
              FROM usage_stats
              ORDER BY timestamp ASC",
         )?;
 
+        // Unfiltered: an export is meant to be complete, and the `kind` column
+        // lets whoever reads it filter for themselves.
         let rows = stmt
             .query_map([], |row| {
                 Ok(UsageRow {
                     timestamp: row.get(0)?,
-                    duration_ms: row.get(1)?,
-                    word_count: row.get(2)?,
-                    processing_ms: row.get(3)?,
-                    model_used: row.get(4)?,
-                    language: row.get(5)?,
-                    post_process_requested: row.get(6)?,
-                    post_process_provider: row.get(7)?,
-                    post_process_model: row.get(8)?,
-                    post_process_ms: row.get(9)?,
-                    post_process_succeeded: row.get(10)?,
+                    kind: EntryKind::from_str(&row.get::<_, String>(1)?),
+                    duration_ms: row.get(2)?,
+                    word_count: row.get(3)?,
+                    processing_ms: row.get(4)?,
+                    model_used: row.get(5)?,
+                    language: row.get(6)?,
+                    post_process_requested: row.get(7)?,
+                    post_process_provider: row.get(8)?,
+                    post_process_model: row.get(9)?,
+                    post_process_ms: row.get(10)?,
+                    post_process_succeeded: row.get(11)?,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -1161,7 +1280,7 @@ impl HistoryManager {
         let conn = self.get_connection()?;
         let (count, total): (i64, Option<i64>) = conn.query_row(
             "SELECT COUNT(*), SUM(word_count) FROM usage_stats
-             WHERE word_count IS NOT NULL AND word_count > 0",
+             WHERE kind = 'dictation' AND word_count IS NOT NULL AND word_count > 0",
             [],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )?;
@@ -1436,6 +1555,38 @@ mod tests {
             )
             .expect("insert post process run");
         }
+    }
+
+    /// An entry that rewrote existing text. `kind` is what the statistics key
+    /// off, and a rewrite has no recording — hence the empty file name.
+    fn insert_rewrite(conn: &Connection, timestamp: i64, kind: EntryKind, text: &str) {
+        conn.execute(
+            "INSERT INTO transcription_history (
+                file_name, timestamp, saved, title, transcription_text,
+                post_process_requested, kind
+            ) VALUES ('', ?1, 0, ?2, ?3, 1, ?4)",
+            params![
+                timestamp,
+                format!("Recording {}", timestamp),
+                text,
+                kind.as_str(),
+            ],
+        )
+        .expect("insert rewrite entry");
+
+        conn.execute(
+            "INSERT INTO usage_stats (history_id, timestamp, kind, duration_ms, word_count, model_used)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                conn.last_insert_rowid(),
+                timestamp,
+                kind.as_str(),
+                1500,
+                text.split_whitespace().count() as i64,
+                "whisper-large-v3-turbo",
+            ],
+        )
+        .expect("insert usage stats");
     }
 
     #[test]
@@ -1722,6 +1873,115 @@ mod tests {
             assert_eq!(day.len(), 10, "expected YYYY-MM-DD, got {day}");
             assert!(*words > 0);
         }
+    }
+
+    /// The whole point of the `kind` column: an instruction like "kürzer" is
+    /// three words spoken over someone else's paragraph. Counted as a dictation
+    /// it would drag down words per day, speaking rate and time saved at once.
+    #[test]
+    fn rewrites_do_not_count_as_dictations() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "ein ordentlich langes diktat mit sechs woertern", None);
+        insert_rewrite(&conn, 200, EntryKind::Command, "kuerzer");
+        insert_rewrite(&conn, 300, EntryKind::Rewrite, "irgendein markierter text");
+
+        let summary = HistoryManager::usage_summary_with_conn(&conn, 40.0).expect("summary");
+
+        assert_eq!(summary.dictations, 1);
+        assert_eq!(summary.words, 7, "only the dictated words are counted");
+        assert_eq!(summary.duration_ms, 4200, "only the dictation's speaking time");
+        assert_eq!(summary.rewrites, 2);
+        assert_eq!(summary.spoken_commands, 1);
+    }
+
+    /// Model statistics describe transcription. A rewrite records the same model
+    /// name because it is the one loaded, but nothing was transcribed for it.
+    #[test]
+    fn model_usage_ignores_rewrites() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "erstes diktat", None);
+        insert_rewrite(&conn, 200, EntryKind::Rewrite, "markierter text");
+
+        let summary = HistoryManager::usage_summary_with_conn(&conn, 40.0).expect("summary");
+
+        let model = summary.models.first().expect("one model");
+        assert_eq!(model.dictations, 1);
+    }
+
+    /// The export is the one place that stays unfiltered — with the kind in the
+    /// row, whoever reads it can separate the two for themselves.
+    #[test]
+    fn export_keeps_every_row_and_says_what_it_is() {
+        let conn = setup_conn();
+        insert_entry(&conn, 100, "ein diktat", None);
+        insert_rewrite(&conn, 200, EntryKind::Command, "foermlicher");
+
+        let mut stmt = conn
+            .prepare("SELECT kind FROM usage_stats ORDER BY timestamp")
+            .expect("prepare");
+        let kinds: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .expect("query")
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .expect("collect");
+
+        assert_eq!(kinds, vec!["dictation", "command"]);
+    }
+
+    /// Everything recorded before the column existed was dictated, so the
+    /// default has to hold retroactively — otherwise the migration would empty
+    /// out every statistic that came before it.
+    #[test]
+    fn entries_from_before_the_column_count_as_dictations() {
+        let mut conn = Connection::open_in_memory().expect("open in-memory db");
+
+        // Migrate to the schema shipped in 0.16.0, write a row the way that
+        // version would have, then migrate the rest of the way.
+        let up_to_fts = MIGRATIONS.len() - 1;
+        Migrations::new(MIGRATIONS[..up_to_fts].to_vec())
+            .to_latest(&mut conn)
+            .expect("run migrations up to 0.16.0");
+        conn.execute(
+            "INSERT INTO transcription_history (
+                file_name, timestamp, saved, title, transcription_text,
+                post_process_requested
+            ) VALUES ('a.wav', 100, 0, 'Recording', 'ein altes diktat', 0)",
+            [],
+        )
+        .expect("insert pre-migration entry");
+        conn.execute(
+            "INSERT INTO usage_stats (history_id, timestamp, word_count, duration_ms)
+             VALUES (1, 100, 3, 4200)",
+            [],
+        )
+        .expect("insert pre-migration stats");
+
+        Migrations::new(MIGRATIONS.to_vec())
+            .to_latest(&mut conn)
+            .expect("run remaining migrations");
+
+        let summary = HistoryManager::usage_summary_with_conn(&conn, 40.0).expect("summary");
+        assert_eq!(summary.dictations, 1, "old rows must still count");
+        assert_eq!(summary.words, 3);
+
+        let entry = HistoryManager::get_latest_entry_with_conn(&conn)
+            .expect("fetch entry")
+            .expect("entry exists");
+        assert_eq!(entry.kind, EntryKind::Dictation);
+    }
+
+    /// The trap this guards against: `join("")` is the directory itself, and it
+    /// exists, so an `exists()` check would wave it straight through to
+    /// `remove_file` — on the folder holding every recording.
+    #[test]
+    fn an_entry_without_a_recording_has_no_file_to_delete() {
+        let dir = std::path::Path::new("/tmp/murmel-recordings");
+
+        assert_eq!(recording_path(dir, ""), None);
+        assert_eq!(
+            recording_path(dir, "murmel-1.wav"),
+            Some(dir.join("murmel-1.wav"))
+        );
     }
 
     /// Rows written under the old schema keep their refined text, and the two

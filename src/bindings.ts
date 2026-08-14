@@ -1116,11 +1116,28 @@ export type ModelUsage = { model: string; dictations: number; average_processing
 /**
  * The numbers behind the Insights view.
  */
-export type UsageSummary = { dictations: number; words: number; duration_ms: number; processing_ms: number; refined: number; refinement_failures: number; saved_ms: number; busiest_hour: number | null; per_day: DailyWords[]; models: ModelUsage[] }
+export type UsageSummary = { dictations: number; words: number; duration_ms: number; processing_ms: number; refined: number; refinement_failures: number; saved_ms: number; busiest_hour: number | null; per_day: DailyWords[]; models: ModelUsage[];
+/**
+ * Existing text that was rewritten rather than dictated. Counted apart
+ * from every number above, which all describe dictating.
+ */
+rewrites: number;
+/**
+ * Of those, the ones steered by a spoken instruction (Command Mode).
+ */
+spoken_commands: number }
 /**
  * One statistics row, for export.
  */
-export type UsageRow = { timestamp: number; duration_ms: number | null; word_count: number | null; processing_ms: number | null; model_used: string | null; language: string | null; post_process_requested: boolean; post_process_provider: string | null; post_process_model: string | null; post_process_ms: number | null; post_process_succeeded: boolean | null }
+export type UsageRow = { timestamp: number; kind: EntryKind; duration_ms: number | null; word_count: number | null; processing_ms: number | null; model_used: string | null; language: string | null; post_process_requested: boolean; post_process_provider: string | null; post_process_model: string | null; post_process_ms: number | null; post_process_succeeded: boolean | null }
+/**
+ * What produced an entry.
+ *
+ * Stored as text rather than an integer so the database stays readable without
+ * a lookup table, and so an unknown value from a newer version degrades to
+ * "treat it as a dictation" instead of silently meaning something else.
+ */
+export type EntryKind = "dictation" | "command" | "rewrite"
 /**
  * A model installed in Ollama.
  */
@@ -1150,7 +1167,13 @@ export type HistoryEntry = { id: number; file_name: string; timestamp: number; s
  * Whether refinement was *asked for* (which hotkey was pressed) — a
  * property of the dictation, unlike the runs themselves.
  */
-post_process_requested: boolean; duration_ms: number | null; word_count: number | null; processing_ms: number | null; model_used: string | null; language: string | null;
+post_process_requested: boolean;
+/**
+ * What produced this entry. The history shows dictations and rewrites side
+ * by side, and without this "make it shorter" reads like a pointless
+ * three-word dictation.
+ */
+kind: EntryKind; duration_ms: number | null; word_count: number | null; processing_ms: number | null; model_used: string | null; language: string | null;
 /**
  * Most recent run from `post_process_runs`, if any.
  */

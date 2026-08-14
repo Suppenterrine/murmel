@@ -4,7 +4,7 @@ use crate::audio_feedback::{play_feedback_sound, play_feedback_sound_blocking, S
 use crate::audio_toolkit::{is_microphone_access_denied, is_no_input_device_error, VadPolicy};
 use crate::managers::audio::AudioRecordingManager;
 use crate::managers::history::{
-    HistoryManager, NewHistoryEntry, NewPostProcessRun, OPENCC_PROVIDER_ID,
+    EntryKind, HistoryManager, NewHistoryEntry, NewPostProcessRun, OPENCC_PROVIDER_ID,
 };
 use crate::managers::model::ModelManager;
 use crate::managers::transcription::StreamWorkKind;
@@ -55,9 +55,38 @@ pub trait ShortcutAction: Send + Sync {
     fn stop(&self, app: &AppHandle, binding_id: &str, shortcut_str: &str);
 }
 
+/// What a press of a dictation hotkey is meant to produce.
+///
+/// This started as a `post_process: bool`, which stopped being enough once a
+/// hotkey could act on text that already exists: the recording, WAV handling,
+/// cancellation and paste are identical in all three cases, and only what
+/// happens between "transcript is ready" and "text is pasted" differs. Keeping
+/// them one action avoids a second copy of the 250-line stop path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DictationMode {
+    /// Paste the transcript as it came out of the model.
+    Plain,
+    /// Run the transcript through the configured refinement prompt first.
+    Refined,
+}
+
+impl DictationMode {
+    /// Whether this mode needs a language model, and therefore should not have
+    /// a registered hotkey while refinement is switched off.
+    fn needs_language_model(self) -> bool {
+        matches!(self, DictationMode::Refined)
+    }
+
+    fn entry_kind(self) -> EntryKind {
+        match self {
+            DictationMode::Plain | DictationMode::Refined => EntryKind::Dictation,
+        }
+    }
+}
+
 // Transcribe Action
 struct TranscribeAction {
-    post_process: bool,
+    mode: DictationMode,
 }
 
 /// Field name for structured output JSON schema
@@ -561,9 +590,9 @@ impl ShortcutAction for TranscribeAction {
         let start_time = Instant::now();
         debug!("TranscribeAction::start called for binding: {}", binding_id);
 
-        // Which of the two dictation hotkeys was pressed decides what the
-        // overlay shows from here until the text is pasted.
-        crate::overlay::set_post_process_active(self.post_process);
+        // Which dictation hotkey was pressed decides what the overlay shows
+        // from here until the text is pasted.
+        crate::overlay::set_post_process_active(self.mode.needs_language_model());
 
         // Load model in the background
         let tm = app.state::<Arc<TranscriptionManager>>();
@@ -744,7 +773,7 @@ impl ShortcutAction for TranscribeAction {
         play_feedback_sound(app, SoundType::Stop);
 
         let binding_id = binding_id.to_string(); // Clone binding_id for the async task
-        let post_process = self.post_process;
+        let mode = self.mode;
         let cancel_generation = rm.cancel_generation();
 
         tauri::async_runtime::spawn(async move {
@@ -846,7 +875,8 @@ impl ShortcutAction for TranscribeAction {
                                 transcription_elapsed, transcription
                             );
 
-                            if post_process {
+                            let refine = mode.needs_language_model();
+                            if refine {
                                 if use_streaming_overlay {
                                     tm.emit_stream_working(StreamWorkKind::Polishing);
                                 } else {
@@ -854,7 +884,7 @@ impl ShortcutAction for TranscribeAction {
                                 }
                             }
                             let Some(processed) = complete_unless_cancelled(
-                                process_transcription_output(&ah, &transcription, post_process),
+                                process_transcription_output(&ah, &transcription, refine),
                                 || rm.was_cancelled_since(cancel_generation),
                             )
                             .await
@@ -882,7 +912,8 @@ impl ShortcutAction for TranscribeAction {
                                 if let Err(err) = hm.save_entry(NewHistoryEntry {
                                     file_name,
                                     transcription_text: transcription,
-                                    post_process_requested: post_process,
+                                    post_process_requested: refine,
+                                    kind: mode.entry_kind(),
                                     duration_ms: Some(samples_to_ms(sample_count)),
                                     word_count: Some(word_count),
                                     processing_ms: Some(transcription_elapsed.as_millis() as i64),
@@ -950,7 +981,8 @@ impl ShortcutAction for TranscribeAction {
                             if wav_saved {
                                 if let Err(save_err) = hm.save_entry(NewHistoryEntry {
                                     file_name,
-                                    post_process_requested: post_process,
+                                    post_process_requested: mode.needs_language_model(),
+                                    kind: mode.entry_kind(),
                                     duration_ms: Some(samples_to_ms(sample_count)),
                                     ..Default::default()
                                 }) {
@@ -1085,12 +1117,14 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
     map.insert(
         "transcribe".to_string(),
         Arc::new(TranscribeAction {
-            post_process: false,
+            mode: DictationMode::Plain,
         }) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "transcribe_with_post_process".to_string(),
-        Arc::new(TranscribeAction { post_process: true }) as Arc<dyn ShortcutAction>,
+        Arc::new(TranscribeAction {
+            mode: DictationMode::Refined,
+        }) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "cancel".to_string(),
