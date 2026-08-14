@@ -160,13 +160,16 @@ easy to miss, and both fail _silently_ — the app simply never sees an update:
 1. **Bump the version first.** The workflow reads it out of
    `src-tauri/tauri.conf.json` and derives the git tag `v<version>` from it. If
    it still says the shipped version, the release collides with the existing
-   tag. There is no script for this; keep the three files in step by hand:
+   tag. Three files carry the version, and each has a tool that knows its
+   format — **never edit them by hand**, least of all with `sed`:
 
+   ```bash
+   cd src-tauri && cargo set-version 0.16.0   # Cargo.toml + Cargo.lock
+   bun pm version 0.16.0 --no-git-tag-version --allow-dirty   # package.json
    ```
-   src-tauri/tauri.conf.json    ← the one the workflow reads
-   src-tauri/Cargo.toml         ← also update Cargo.lock (cargo check)
-   package.json
-   ```
+
+   `src-tauri/tauri.conf.json` — the one the workflow actually reads — has no
+   such tool, so it is the one file edited directly.
 
 2. **Nothing — publishing is automatic.** The workflow still creates a draft,
    but a final job (`publish-release`) releases it once every build has
