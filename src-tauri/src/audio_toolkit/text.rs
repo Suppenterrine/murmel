@@ -133,6 +133,76 @@ fn find_best_match<'a>(
     best_match.map(|m| (m, best_score))
 }
 
+/// Words the user introduced when correcting a transcript.
+///
+/// Compares the two texts as *sets* of words rather than aligning them
+/// position by position. Someone correcting a dictation also rearranges,
+/// deletes and adds text, and an alignment would report every shift as a
+/// change. What matters here is narrower: which words are in the corrected
+/// version that were not there before — those are the candidates the
+/// recogniser got wrong.
+///
+/// Deliberately conservative, because the result is *suggested* to the user and
+/// a wrong suggestion costs more attention than a missing one:
+///
+/// - Case and punctuation are ignored when comparing, but the entry keeps the
+///   spelling the user typed.
+/// - Short words need a capital to qualify. Length alone is not enough: "und",
+///   "nur" and "ist" are three characters and pure noise, while "API" and "Öl"
+///   are exactly the kind of term worth teaching. A capital letter is what
+///   separates a name or an abbreviation from a particle.
+/// - Words already known to the dictionary are skipped.
+pub fn suggest_dictionary_entries(
+    original: &str,
+    corrected: &str,
+    known: &[String],
+) -> Vec<String> {
+    /// Strip surrounding punctuation and lowercase, for comparison only.
+    fn key(word: &str) -> String {
+        word.trim_matches(|c: char| !c.is_alphanumeric())
+            .to_lowercase()
+    }
+
+    let before: std::collections::HashSet<String> = original.split_whitespace().map(key).collect();
+    let known: std::collections::HashSet<String> = known.iter().map(|w| key(w)).collect();
+
+    let mut seen = std::collections::HashSet::new();
+    let mut suggestions = Vec::new();
+
+    /// Words this short only qualify with a capital letter (see the doc
+    /// comment). Above it, length is taken as evidence enough.
+    const SHORT_WORD_LIMIT: usize = 5;
+
+    for word in corrected.split_whitespace() {
+        let comparable = key(word);
+
+        // `chars().count()`, not `len()`: "Öl" is two characters but three
+        // bytes, and byte length would silently drop non-ASCII words.
+        let length = comparable.chars().count();
+        if length < 2 {
+            continue;
+        }
+        if length < SHORT_WORD_LIMIT && !word.chars().any(char::is_uppercase) {
+            continue;
+        }
+        if before.contains(&comparable) || known.contains(&comparable) {
+            continue;
+        }
+        if !seen.insert(comparable) {
+            continue;
+        }
+
+        // Keep the user's spelling, minus punctuation they did not mean to
+        // include ("ChargeBee." → "ChargeBee").
+        let cleaned = word.trim_matches(|c: char| !c.is_alphanumeric());
+        if !cleaned.is_empty() {
+            suggestions.push(cleaned.to_string());
+        }
+    }
+
+    suggestions
+}
+
 /// Applies custom word corrections to transcribed text using fuzzy matching
 ///
 /// This function corrects words in the input text by finding the best matches
@@ -431,6 +501,116 @@ pub fn normalize_transcription_output(text: &str) -> String {
 
     // Trim leading/trailing whitespace
     normalized.trim().to_string()
+}
+
+#[cfg(test)]
+mod suggestion_tests {
+    use super::suggest_dictionary_entries;
+
+    #[test]
+    fn suggests_the_word_the_user_introduced() {
+        let suggestions = suggest_dictionary_entries(
+            "ich nutze Charge B für die Abrechnung",
+            "ich nutze ChargeBee für die Abrechnung",
+            &[],
+        );
+
+        assert_eq!(suggestions, vec!["ChargeBee"]);
+    }
+
+    /// Rearranging words is not a correction. Comparing as sets keeps a moved
+    /// sentence from producing a list of "new" words.
+    #[test]
+    fn reordering_alone_suggests_nothing() {
+        let suggestions =
+            suggest_dictionary_entries("heute war das Wetter gut", "das Wetter war heute gut", &[]);
+
+        assert!(suggestions.is_empty());
+    }
+
+    /// Lowercase particles are noise, however long they are — "und", "nur" and
+    /// "aber" have no business in a dictionary.
+    #[test]
+    fn lowercase_particles_are_ignored() {
+        let suggestions =
+            suggest_dictionary_entries("das ist ein Test", "das ist nur aber ein Test", &[]);
+
+        assert!(suggestions.is_empty(), "got {suggestions:?}");
+    }
+
+    /// Short *and* capitalised is the signature of an abbreviation or a name —
+    /// exactly what the dictionary is for.
+    #[test]
+    fn short_capitalised_terms_are_suggested() {
+        let suggestions =
+            suggest_dictionary_entries("die schnittstelle antwortet", "die API antwortet", &[]);
+
+        assert_eq!(suggestions, vec!["API"]);
+    }
+
+    /// Punctuation and capitalisation must not make a known word look new —
+    /// nor should they end up inside the entry.
+    #[test]
+    fn punctuation_and_case_do_not_create_entries() {
+        let suggestions =
+            suggest_dictionary_entries("wir nutzen kubernetes", "Wir nutzen Kubernetes, ja.", &[]);
+
+        assert!(
+            suggestions.is_empty(),
+            "same word, different case and punctuation: {suggestions:?}"
+        );
+    }
+
+    #[test]
+    fn entries_keep_the_users_spelling_without_trailing_punctuation() {
+        let suggestions =
+            suggest_dictionary_entries("wir nutzen kubernetis", "wir nutzen Kubernetes.", &[]);
+
+        assert_eq!(suggestions, vec!["Kubernetes"]);
+    }
+
+    #[test]
+    fn words_already_in_the_dictionary_are_not_suggested_again() {
+        let known = vec!["ChargeBee".to_string()];
+        let suggestions = suggest_dictionary_entries("nutze Charge B", "nutze ChargeBee", &known);
+
+        assert!(suggestions.is_empty());
+    }
+
+    /// Non-ASCII words must survive the length check — "Öl" is two characters
+    /// but three bytes, and a byte-length test would treat longer words like
+    /// "Grüße" inconsistently.
+    #[test]
+    fn umlauts_are_measured_in_characters() {
+        let suggestions = suggest_dictionary_entries("liebe gruesse", "liebe Grüße", &[]);
+
+        assert_eq!(suggestions, vec!["Grüße"]);
+    }
+
+    #[test]
+    fn a_word_added_twice_is_suggested_once() {
+        let suggestions = suggest_dictionary_entries("test", "ChargeBee und ChargeBee test", &[]);
+
+        assert_eq!(suggestions, vec!["ChargeBee"]);
+    }
+
+    /// A heavily rewritten dictation yields its new terms — but never the
+    /// particles that came along with them.
+    #[test]
+    fn a_rewritten_text_yields_its_terms_but_no_particles() {
+        let suggestions = suggest_dictionary_entries(
+            "alter text",
+            "Kubernetes und Terraform verwalten die Infrastruktur",
+            &[],
+        );
+
+        assert!(suggestions.contains(&"Kubernetes".to_string()));
+        assert!(suggestions.contains(&"Terraform".to_string()));
+        assert!(
+            !suggestions.contains(&"und".to_string()),
+            "particles must not slip in: {suggestions:?}"
+        );
+    }
 }
 
 #[cfg(test)]

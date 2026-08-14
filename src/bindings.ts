@@ -272,6 +272,14 @@ async searchHistoryEntries(query: string | null, onlySaved: boolean, limit: numb
     else return { status: "error", error: e  as any };
 }
 },
+async correctHistoryEntry(id: number, correctedText: string) : Promise<Result<string[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("correct_history_entry", { id, correctedText }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async getUsageSummary() : Promise<Result<UsageSummary, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_usage_summary") };

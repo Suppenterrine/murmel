@@ -84,6 +84,39 @@ pub async fn clear_usage_stats(
         .map_err(|e| e.to_string())
 }
 
+/// Save a corrected transcript and report what the dictionary could learn.
+///
+/// The suggestions are returned, not applied: a correction can contain a typo
+/// of its own, and a dictionary entry silently taught from one would then bend
+/// every future dictation towards it. The user confirms.
+#[tauri::command]
+#[specta::specta]
+pub async fn correct_history_entry(
+    app: AppHandle,
+    history_manager: State<'_, Arc<HistoryManager>>,
+    id: i64,
+    corrected_text: String,
+) -> Result<Vec<String>, String> {
+    let entry = history_manager
+        .get_entry_by_id(id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("History entry {} not found", id))?;
+
+    let known = crate::settings::get_settings(&app).custom_words;
+    let suggestions = crate::audio_toolkit::text::suggest_dictionary_entries(
+        &entry.transcription_text,
+        &corrected_text,
+        &known,
+    );
+
+    history_manager
+        .update_transcription_text(id, &corrected_text)
+        .map_err(|e| e.to_string())?;
+
+    Ok(suggestions)
+}
+
 /// Average words per dictation, or `null` while there is too little to average.
 ///
 /// Feeds the cost estimate in the model picker: a price per million tokens

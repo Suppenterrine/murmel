@@ -176,6 +176,12 @@
         "refinement": "Nachbearbeitung"
       },
       "refinementDescription": "Wähle das Sprachmodell, das deine Diktate aufräumt. Auf diesem Rechner über Ollama oder über OpenRouter.",
+      "selected": "Ausgewähltes Modell",
+      "selectedLocal": "(auf diesem Rechner)",
+      "selectedRemote": "(über OpenRouter)",
+      "selectedNone": "Noch keins gewählt — die Nachbearbeitung bleibt ohne Wirkung.",
+      "viaProvider": "Über {{provider}}",
+      "openSettings": "Einstellungen öffnen",
       "description": "Wähle ein Transkriptionsmodell aus oder lade zusätzliche Modelle herunter. Verschiedene Modelle bieten unterschiedliche Genauigkeits- und Geschwindigkeitsstufen.",
       "deleteConfirm": "Bist du sicher, dass du {{modelName}} löschen möchtest? Du musst es erneut herunterladen, um es zu verwenden.",
       "deleteActiveConfirm": "{{modelName}} ist dein aktives Modell. Das Löschen stoppt Transkriptionen, bis du ein neues Modell auswählst. Bist du sicher?",
@@ -551,6 +557,13 @@
         "wpm": "{{wpm}} Wörter/Min",
         "processing": "{{seconds}} s erkannt",
         "refinementFailed": "Nachbearbeitung fehlgeschlagen"
+      },
+      "correction": {
+        "edit": "Text korrigieren",
+        "save": "Korrektur speichern",
+        "learn": "Ins Lexikon aufnehmen?",
+        "added": "„{{word}}\" ins Lexikon aufgenommen",
+        "dismiss": "Nein danke"
       },
       "searchPlaceholder": "Verlauf durchsuchen …",
       "onlyFavorites": "Nur Favoriten",

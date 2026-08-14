@@ -5,6 +5,8 @@ import {
   Check,
   Copy,
   FolderOpen,
+  Pencil,
+  Plus,
   RotateCcw,
   Search,
   Star,
@@ -22,6 +24,7 @@ import { useOsType } from "@/hooks/useOsType";
 import { formatDateTime } from "@/utils/dateFormat";
 import { AudioPlayer, AudioPlayerGroup } from "../../ui/AudioPlayer";
 import { Button } from "../../ui/Button";
+import { useSettings } from "../../../hooks/useSettings";
 
 const IconButton: React.FC<{
   onClick: () => void;
@@ -513,9 +516,140 @@ const HistoryEntryComponent: React.FC<HistoryEntryProps> = ({
             : t("settings.history.transcriptionFailed")}
       </p>
 
+      {hasTranscription && !retrying && (
+        <TranscriptCorrection id={entry.id} text={entry.transcription_text} />
+      )}
+
       <EntryMetrics entry={entry} />
 
       <AudioPlayer onLoadRequest={handleLoadAudio} className="w-full" />
+    </div>
+  );
+};
+
+/**
+ * Correcting a transcript — and teaching the dictionary from it.
+ *
+ * This is where words Murmel gets wrong become words it gets right. The
+ * alternative would be reading the corrections out of whatever program the text
+ * was pasted into, which means a dictation tool watching foreign text fields;
+ * doing it here costs one extra step and no surveillance.
+ *
+ * Suggestions are offered, never adopted automatically: a correction can carry
+ * a typo of its own, and a dictionary entry learned from one would bend every
+ * later dictation towards it.
+ */
+const TranscriptCorrection: React.FC<{ id: number; text: string }> = ({
+  id,
+  text,
+}) => {
+  const { t } = useTranslation();
+  const { getSetting, updateSetting } = useSettings();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+  const [saving, setSaving] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    setDraft(text);
+  }, [text]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const result = await commands.correctHistoryEntry(id, draft);
+      if (result.status === "ok") {
+        setSuggestions(result.data);
+        setEditing(false);
+      } else {
+        toast.error(String(result.error));
+      }
+    } catch (error) {
+      toast.error(String(error));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const adopt = (word: string) => {
+    const known = getSetting("custom_words") || [];
+    if (!known.includes(word)) {
+      updateSetting("custom_words", [...known, word]);
+    }
+    setSuggestions((previous) => previous.filter((entry) => entry !== word));
+    toast.success(t("settings.history.correction.added", { word }));
+  };
+
+  if (suggestions.length > 0) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-text/60">
+          {t("settings.history.correction.learn")}
+        </span>
+        {suggestions.map((word) => (
+          <button
+            key={word}
+            type="button"
+            onClick={() => adopt(word)}
+            className="px-2 py-1 rounded-md bg-logo-primary/15 text-logo-primary hover:bg-logo-primary/25 transition-colors"
+          >
+            <Plus className="w-3 h-3 inline me-1" />
+            {word}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setSuggestions([])}
+          className="text-text/40 hover:text-text transition-colors"
+        >
+          {t("settings.history.correction.dismiss")}
+        </button>
+      </div>
+    );
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="self-start text-xs text-text/40 hover:text-logo-primary transition-colors"
+      >
+        <Pencil className="w-3 h-3 inline me-1" />
+        {t("settings.history.correction.edit")}
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <textarea
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        rows={Math.min(Math.ceil(draft.length / 70) + 1, 8)}
+        className="w-full px-3 py-2 text-sm rounded-md bg-background border border-mid-gray/40 text-text focus:outline-none focus:border-logo-primary/50 resize-none"
+        autoFocus
+      />
+      <div className="flex items-center gap-2">
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={save}
+          disabled={saving || draft.trim() === text.trim()}
+        >
+          {t("settings.history.correction.save")}
+        </Button>
+        <button
+          type="button"
+          onClick={() => {
+            setEditing(false);
+            setDraft(text);
+          }}
+          className="text-xs text-text/40 hover:text-text transition-colors"
+        >
+          {t("common.cancel")}
+        </button>
+      </div>
     </div>
   );
 };

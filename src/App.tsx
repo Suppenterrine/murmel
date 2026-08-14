@@ -21,6 +21,7 @@ import { useSettings } from "./hooks/useSettings";
 import { useSettingsStore } from "./stores/settingsStore";
 import { commands } from "@/bindings";
 import { getLanguageDirection, initializeRTL } from "@/lib/utils/rtl";
+import { onNavigateToSection } from "@/lib/navigate";
 
 type OnboardingStep = "accessibility" | "model" | "done";
 
@@ -48,6 +49,17 @@ function App() {
     (state) => state.refreshOutputDevices,
   );
   const hasCompletedPostOnboardingInit = useRef(false);
+
+  // Lets a section link to another one — see lib/navigate.ts.
+  useEffect(
+    () =>
+      onNavigateToSection((section) => {
+        if (section in SECTIONS_CONFIG) {
+          setCurrentSection(section as SidebarSection);
+        }
+      }),
+    [],
+  );
 
   useEffect(() => {
     checkOnboardingStatus();

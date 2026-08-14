@@ -217,6 +217,12 @@
         "refinement": "Refinement"
       },
       "refinementDescription": "Choose the language model that tidies up your dictations — on this machine via Ollama, or via OpenRouter.",
+      "selected": "Selected model",
+      "selectedLocal": "(on this machine)",
+      "selectedRemote": "(via OpenRouter)",
+      "selectedNone": "None chosen yet — refinement will have no effect.",
+      "viaProvider": "Via {{provider}}",
+      "openSettings": "Open settings",
       "description": "Select a transcription model or download additional models. Different models offer varying levels of accuracy and speed.",
       "searchPlaceholder": "Search models by name…",
       "yourModels": "Downloaded Models",
@@ -551,6 +557,13 @@
         "wpm": "{{wpm}} words/min",
         "processing": "{{seconds}}s recognised",
         "refinementFailed": "Refinement failed"
+      },
+      "correction": {
+        "edit": "Correct text",
+        "save": "Save correction",
+        "learn": "Add to dictionary?",
+        "added": "\"{{word}}\" added to the dictionary",
+        "dismiss": "No thanks"
       },
       "searchPlaceholder": "Search history…",
       "onlyFavorites": "Favourites only",

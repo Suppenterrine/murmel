@@ -727,6 +727,40 @@ impl HistoryManager {
         })
     }
 
+    /// Replace a transcript with the user's corrected version.
+    ///
+    /// Only the text: the metrics describe what was *dictated* — how long it
+    /// took to speak and to recognise — and correcting a word afterwards does
+    /// not change any of that. Rewriting the word count here would quietly
+    /// distort the speaking pace in the statistics.
+    pub fn update_transcription_text(&self, id: i64, text: &str) -> Result<HistoryEntry> {
+        let conn = self.get_connection()?;
+        let updated = conn.execute(
+            "UPDATE transcription_history SET transcription_text = ?1 WHERE id = ?2",
+            params![text, id],
+        )?;
+
+        if updated == 0 {
+            return Err(anyhow!("History entry {} not found", id));
+        }
+
+        let entry = conn.query_row(
+            &format!("{ENTRY_SELECT} WHERE h.id = ?1"),
+            params![id],
+            Self::map_history_entry,
+        )?;
+
+        if let Err(e) = (HistoryUpdatePayload::Updated {
+            entry: entry.clone(),
+        })
+        .emit(&self.app_handle)
+        {
+            error!("Failed to emit history-updated event: {}", e);
+        }
+
+        Ok(entry)
+    }
+
     /// Update an existing history entry with new transcription results (used by retry).
     ///
     /// The metrics are rewritten along with the text: a retry may well use a
