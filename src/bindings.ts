@@ -232,9 +232,33 @@ async changePostProcessBaseUrlSetting(providerId: string, baseUrl: string) : Pro
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Store an API key in the system credential store.
+ * 
+ * An empty value removes it, so a cleared field needs no separate command.
+ * Errors are returned rather than swallowed: the user has to know when a key
+ * was *not* saved, or they will wonder why requests keep failing.
+ */
 async changePostProcessApiKeySetting(providerId: string, apiKey: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("change_post_process_api_key_setting", { providerId, apiKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Whether a key is stored for this provider.
+ * 
+ * The key itself is never handed to the frontend — it has no use for the
+ * value, only for the fact that one exists.
+ */
+async hasPostProcessApiKey(providerId: string) : Promise<boolean> {
+    return await TAURI_INVOKE("has_post_process_api_key", { providerId });
+},
+async deletePostProcessApiKey(providerId: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_post_process_api_key", { providerId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -264,14 +288,90 @@ async fetchPostProcessModels(providerId: string) : Promise<Result<string[], stri
     else return { status: "error", error: e  as any };
 }
 },
-async searchHistoryEntries(query: string | null, onlySaved: boolean, limit: number | null) : Promise<Result<HistoryEntry[], string>> {
+/**
+ * Check a refinement provider before it is used in anger.
+ * 
+ * Without this, a stopped Ollama is invisible until a dictation quietly comes
+ * back unrefined — the failure looks like "the feature does nothing" rather
+ * than "the service is not running".
+ */
+async checkPostProcessEndpoint(providerId: string) : Promise<Result<EndpointStatus, string>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("search_history_entries", { query, onlySaved, limit }) };
+    return { status: "ok", data: await TAURI_INVOKE("check_post_process_endpoint", { providerId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Start the local language-model service and wait until it answers.
+ * 
+ * Refusing for remote providers is not pedantry: "start the service" has no
+ * meaning for an endpoint on someone else's machine, and silently doing
+ * nothing would look like a failed launch.
+ */
+async startLocalLlmService(providerId: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_local_llm_service", { providerId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stop the local service — only the one Murmel started.
+ */
+async stopLocalLlmService() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_local_llm_service") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Models installed in the local service, with size and quantisation.
+ */
+async listLocalLlmModels() : Promise<Result<LocalModel[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_local_llm_models") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * OpenRouter's catalogue, prices included. Needs no API key.
+ */
+async listRemoteLlmModels() : Promise<Result<RemoteModel[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_remote_llm_models") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Average words per dictation, or `null` while there is too little to average.
+ * 
+ * Feeds the cost estimate in the model picker: a price per million tokens
+ * answers a question nobody has, a price per dictation answers the one they do.
+ */
+async getAverageDictationWords() : Promise<Result<number | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_average_dictation_words") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Save a corrected transcript and report what the dictionary could learn.
+ * 
+ * The suggestions are returned, not applied: a correction can contain a typo
+ * of its own, and a dictionary entry silently taught from one would then bend
+ * every future dictation towards it. The user confirms.
+ */
 async correctHistoryEntry(id: number, correctedText: string) : Promise<Result<string[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("correct_history_entry", { id, correctedText }) };
@@ -288,6 +388,9 @@ async getUsageSummary() : Promise<Result<UsageSummary, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * All statistics rows, for the user to take with them.
+ */
 async exportUsageStats() : Promise<Result<UsageRow[], string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("export_usage_stats") };
@@ -296,73 +399,12 @@ async exportUsageStats() : Promise<Result<UsageRow[], string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Erase the statistics without touching the history.
+ */
 async clearUsageStats() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("clear_usage_stats") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async hasPostProcessApiKey(providerId: string) : Promise<Result<boolean, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("has_post_process_api_key", { providerId }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async deletePostProcessApiKey(providerId: string) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("delete_post_process_api_key", { providerId }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async listLocalLlmModels() : Promise<Result<LocalModel[], string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("list_local_llm_models") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async listRemoteLlmModels() : Promise<Result<RemoteModel[], string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("list_remote_llm_models") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async getAverageDictationWords() : Promise<Result<number | null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("get_average_dictation_words") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async stopLocalLlmService() : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("stop_local_llm_service") };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async startLocalLlmService(providerId: string) : Promise<Result<null, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("start_local_llm_service", { providerId }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async checkPostProcessEndpoint(providerId: string) : Promise<Result<EndpointStatus, string>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("check_post_process_endpoint", { providerId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -400,6 +442,9 @@ async setPostProcessSelectedPrompt(id: string) : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Which prompt the rewrite hotkey runs over a selection.
+ */
 async setRewritePrompt(id: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("set_rewrite_prompt", { id }) };
@@ -952,6 +997,22 @@ async getHistoryEntries(cursor: number | null, limit: number | null) : Promise<R
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Search the history, optionally limited to saved entries.
+ * 
+ * Separate from `get_history_entries` rather than an extra parameter there:
+ * that one pages through the history by cursor, this one ranks by relevance,
+ * and mixing the two would mean a cursor that means different things depending
+ * on whether a search term is present.
+ */
+async searchHistoryEntries(query: string | null, onlySaved: boolean, limit: number | null) : Promise<Result<HistoryEntry[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("search_history_entries", { query, onlySaved, limit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async toggleHistoryEntrySaved(id: number) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("toggle_history_entry_saved", { id }) };
@@ -1063,7 +1124,29 @@ whats_new_last_seen_version?: string; selected_model?: string; onboarding_comple
  * Which input channel to use on the selected microphone device.
  * None means "average all channels" (original behavior).
  */
-selected_channel?: number | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; model_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; post_process_selected_prompt_id?: string | null; rewrite_prompt_id?: string | null; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; theme?: Theme; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; paste_delay_after_ms?: number; 
+selected_channel?: number | null; clamshell_microphone?: string | null; selected_output_device?: string | null; translate_to_english?: boolean; selected_language?: string; overlay_position?: OverlayPosition; debug_mode?: boolean; log_level?: LogLevel; custom_words?: string[]; model_unload_timeout?: ModelUnloadTimeout; word_correction_threshold?: number; history_limit?: number; recording_retention_period?: RecordingRetentionPeriod; paste_method?: PasteMethod; clipboard_handling?: ClipboardHandling; auto_submit?: boolean; auto_submit_key?: AutoSubmitKey; post_process_enabled?: boolean; post_process_provider_id?: string; post_process_providers?: PostProcessProvider[]; post_process_api_keys?: SecretMap; post_process_models?: Partial<{ [key in string]: string }>; post_process_prompts?: LLMPrompt[]; 
+/**
+ * Which generation of built-in presets has been backfilled into
+ * `post_process_prompts`. See `ensure_post_process_defaults`.
+ */
+post_process_presets_version?: number; 
+/**
+ * Start the local language-model service on launch when refinement is
+ * enabled and points at this machine.
+ * 
+ * On by default, because the alternative is worse than it looks: a stopped
+ * Ollama does not produce an error, it produces dictations that silently
+ * arrive unrefined.
+ */
+auto_start_local_llm?: boolean; post_process_selected_prompt_id?: string | null; 
+/**
+ * Which prompt the rewrite hotkey runs over a selection.
+ * 
+ * Its own setting rather than a reuse of the one above: dictating usually
+ * wants tidying, while a selection is more often turned into something else
+ * entirely. Sharing one selection would make every switch a trade.
+ */
+rewrite_prompt_id?: string | null; mute_while_recording?: boolean; append_trailing_space?: boolean; app_language?: string; theme?: Theme; experimental_enabled?: boolean; lazy_stream_close?: boolean; keyboard_implementation?: KeyboardImplementation; show_tray_icon?: boolean; paste_delay_ms?: number; paste_delay_after_ms?: number; 
 /**
  * Debug-gated ("beta") receipt-sequenced paste: restore the clipboard only
  * after the target app actually reads the transcript, instead of after a
@@ -1082,6 +1165,41 @@ export type AvailableAccelerators = { transcribe: string[]; ort: string[]; gpu_d
 export type BindingResponse = { success: boolean; binding: ShortcutBinding | null; error: string | null }
 export type ClipboardHandling = "dont_modify" | "copy_to_clipboard"
 export type CustomSounds = { start: boolean; stop: boolean }
+/**
+ * Words dictated on one calendar day, local time.
+ */
+export type DailyWords = { 
+/**
+ * `YYYY-MM-DD`.
+ */
+day: string; words: number }
+/**
+ * Where a refinement provider sends the dictated text, and — for local ones —
+ * whether it is actually running.
+ */
+export type EndpointStatus = { 
+/**
+ * False means the dictated text leaves this machine. The UI has to say so
+ * (Murmel_Northstar.md §5.2).
+ */
+is_local: boolean; 
+/**
+ * `None` for remote endpoints: Murmel does not call a cloud API just to
+ * draw a status dot, and a paid endpoint should not be poked on a whim.
+ */
+reachable: boolean | null; models: string[]; 
+/**
+ * Why the local endpoint could not be reached, for the UI to show.
+ */
+error: string | null; 
+/**
+ * Process id, when Murmel is the one running the service.
+ * 
+ * A background process is only acceptable if it is visible and
+ * controllable — this is what lets the UI say "started by Murmel (pid N)"
+ * and offer to stop it, instead of leaving something running unseen.
+ */
+owned_pid: number | null }
 export type EngineType = 
 /**
  * Any GGML/GGUF model loaded through transcribe-cpp (Whisper, Parakeet,
@@ -1090,99 +1208,39 @@ export type EngineType =
  */
 "TranscribeCpp" | "Parakeet" | "Moonshine" | "MoonshineStreaming" | "SenseVoice" | "GigaAM" | "Canary" | "Cohere"
 /**
- * Where a refinement provider sends the dictated text, and — for local ones —
- * whether it is actually running.
- */
-export type EndpointStatus = {
-/**
- * False means the dictated text leaves this machine. The UI has to say so
- * (Murmel_Northstar.md §5.2).
- */
-is_local: boolean;
-/**
- * `None` for remote endpoints: Murmel does not call a cloud API just to
- * draw a status dot, and a paid endpoint should not be poked on a whim.
- */
-reachable: boolean | null; models: string[];
-/**
- * Why the local endpoint could not be reached, for the UI to show.
- */
-error: string | null;
-/**
- * Process id, when Murmel is the one running the service.
- */
-owned_pid: number | null }
-export type GpuDeviceOption = { id: number; name: string; total_vram_mb: number }
-/**
- * Words dictated on one calendar day, local time.
- */
-export type DailyWords = { day: string; words: number }
-/**
- * How much a given model was used, and how fast it was.
- */
-export type ModelUsage = { model: string; dictations: number; average_processing_ms: number }
-/**
- * The numbers behind the Insights view.
- */
-export type UsageSummary = { dictations: number; words: number; duration_ms: number; processing_ms: number; refined: number; refinement_failures: number; saved_ms: number; busiest_hour: number | null; per_day: DailyWords[]; models: ModelUsage[];
-/**
- * Existing text that was rewritten rather than dictated. Counted apart
- * from every number above, which all describe dictating.
- */
-rewrites: number;
-/**
- * Of those, the ones steered by a spoken instruction (Command Mode).
- */
-spoken_commands: number }
-
-/**
- * One statistics row, for export.
- */
-export type UsageRow = { timestamp: number; kind: EntryKind; duration_ms: number | null; word_count: number | null; processing_ms: number | null; model_used: string | null; language: string | null; post_process_requested: boolean; post_process_provider: string | null; post_process_model: string | null; post_process_ms: number | null; post_process_succeeded: boolean | null }
-/**
  * What produced an entry.
- *
+ * 
  * Stored as text rather than an integer so the database stays readable without
  * a lookup table, and so an unknown value from a newer version degrades to
  * "treat it as a dictation" instead of silently meaning something else.
  */
-export type EntryKind = "dictation" | "command" | "rewrite"
+export type EntryKind = 
 /**
- * A model installed in Ollama.
+ * Spoken from scratch. Everything before 0.17.0 is this.
  */
-export type LocalModel = {
+"dictation" | 
 /**
- * Tag as Ollama knows it, e.g. `qwen3:4b` — this is what gets configured.
+ * Existing text, rewritten according to a spoken instruction. The
+ * transcript is the *instruction*, not the result.
  */
-name: string; size_bytes: number;
+"command" | 
 /**
- * e.g. "8.0B". Ollama reports it as text, and it is shown as text.
+ * Existing text, run through a preset without speaking.
  */
-parameter_size: string | null;
-/**
- * e.g. "Q4_K_M".
- */
-quantization: string | null; family: string | null }
-/**
- * A model offered through OpenRouter.
- */
-export type RemoteModel = { id: string; name: string; context_length: number;
-/**
- * Price per *token*, as the catalogue states it.
- */
-prompt_price: number; completion_price: number; is_free: boolean }
-export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string;
+"rewrite"
+export type GpuDeviceOption = { id: number; name: string; total_vram_mb: number }
+export type HistoryEntry = { id: number; file_name: string; timestamp: number; saved: boolean; title: string; transcription_text: string; 
 /**
  * Whether refinement was *asked for* (which hotkey was pressed) — a
  * property of the dictation, unlike the runs themselves.
  */
-post_process_requested: boolean;
+post_process_requested: boolean; 
 /**
  * What produced this entry. The history shows dictations and rewrites side
  * by side, and without this "make it shorter" reads like a pointless
  * three-word dictation.
  */
-kind: EntryKind; duration_ms: number | null; word_count: number | null; processing_ms: number | null; model_used: string | null; language: string | null;
+kind: EntryKind; duration_ms: number | null; word_count: number | null; processing_ms: number | null; model_used: string | null; language: string | null; 
 /**
  * Most recent run from `post_process_runs`, if any.
  */
@@ -1203,6 +1261,22 @@ export type KeyboardDiagnosticReport = { secure_input_enabled: boolean; culprit_
 key_down: number; key_up: number; flags_changed: number; mouse: number; duration_ms: number }
 export type KeyboardImplementation = "tauri" | "handy_keys"
 export type LLMPrompt = { id: string; name: string; prompt: string }
+/**
+ * A model installed in Ollama.
+ */
+export type LocalModel = { 
+/**
+ * Tag as Ollama knows it, e.g. `qwen3:4b` — this is what gets configured.
+ */
+name: string; size_bytes: number; 
+/**
+ * e.g. "8.0B". Ollama reports it as text, and it is shown as text.
+ */
+parameter_size: string | null; 
+/**
+ * e.g. "Q4_K_M".
+ */
+quantization: string | null; family: string | null }
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error"
 export type ModelInfo = { id: string; name: string; description: string; filename: string; source: ModelSource; size_mb: number; is_downloaded: boolean; is_downloading: boolean; partial_size: number; is_directory: boolean; engine_type: EngineType; accuracy_score: number; speed_score: number; supports_translation: boolean; is_recommended: boolean; supported_languages: string[]; supports_language_selection: boolean; is_custom: boolean; supports_streaming: boolean; supports_language_detection: boolean }
 export type ModelLoadStatus = { is_loaded: boolean; current_model: string | null }
@@ -1231,6 +1305,10 @@ sha256: string | null } } |
  */
 "Local"
 export type ModelUnloadTimeout = "never" | "immediately" | "min_2" | "min_5" | "min_10" | "min_15" | "hour_1" | "sec_15"
+/**
+ * How much a given model was used, and how fast it was.
+ */
+export type ModelUsage = { model: string; dictations: number; average_processing_ms: number }
 export type OrtAcceleratorSetting = "auto" | "cpu" | "cuda" | "directml" | "rocm"
 export type OverlayPosition = "top" | "bottom"
 /**
@@ -1247,18 +1325,29 @@ export type PostProcessProvider = { id: string; label: string; base_url: string;
 /**
  * A single pass of a transcript through text refinement — an LLM call, or the
  * Chinese-variant conversion (see [`OPENCC_PROVIDER_ID`]).
- *
+ * 
  * Failed runs are recorded too, with `succeeded = false` and the reason in
  * `error`. That is deliberate: the share of runs that fail is the number that
  * tells you whether a local model is actually dependable.
  */
-export type PostProcessRun = { id: number; history_id: number; timestamp: number; provider_id: string; model: string | null; prompt_id: string | null; prompt_text: string | null;
+export type PostProcessRun = { id: number; history_id: number; timestamp: number; provider_id: string; model: string | null; prompt_id: string | null; prompt_text: string | null; 
 /**
  * What the model was given. Usually the raw transcript, but not
  * necessarily — a second pass refines the first pass's output.
  */
 input_text: string; output_text: string | null; duration_ms: number | null; succeeded: boolean; error: string | null }
 export type RecordingRetentionPeriod = "never" | "preserve_limit" | "days_3" | "weeks_2" | "months_3"
+/**
+ * A model offered through OpenRouter.
+ */
+export type RemoteModel = { id: string; name: string; context_length: number; 
+/**
+ * Price per *token*, as the catalogue states it. Converting to something
+ * human-sized is the display's job — and for Murmel that is not "per
+ * million" but "per dictation", which only the frontend can work out
+ * because only it knows how long the user's dictations actually are.
+ */
+prompt_price: number; completion_price: number; is_free: boolean }
 export type SecretMap = Partial<{ [key in string]: string }>
 export type SecureInputStatus = { 
 /**
@@ -1333,6 +1422,48 @@ export type StreamWorkKind = "transcribing" | "polishing"
 export type Theme = "system" | "light" | "dark"
 export type TranscribeAcceleratorSetting = "auto" | "cpu" | "gpu"
 export type TypingTool = "auto" | "wtype" | "kwtype" | "dotool" | "ydotool" | "xdotool"
+/**
+ * One statistics row, for export.
+ */
+export type UsageRow = { timestamp: number; kind: EntryKind; duration_ms: number | null; word_count: number | null; processing_ms: number | null; model_used: string | null; language: string | null; post_process_requested: boolean; post_process_provider: string | null; post_process_model: string | null; post_process_ms: number | null; post_process_succeeded: boolean | null }
+/**
+ * The numbers behind the Insights view.
+ */
+export type UsageSummary = { dictations: number; words: number; 
+/**
+ * Time spent speaking.
+ */
+duration_ms: number; 
+/**
+ * Time the speech-to-text engine spent.
+ */
+processing_ms: number; refined: number; 
+/**
+ * Refinement attempts that failed — the number that says whether a local
+ * model is dependable.
+ */
+refinement_failures: number; 
+/**
+ * Estimated time saved against typing, never negative.
+ */
+saved_ms: number; 
+/**
+ * Hour of day (0–23) with the most dictations, if there are any.
+ */
+busiest_hour: number | null; 
+/**
+ * Up to 30 days, oldest first.
+ */
+per_day: DailyWords[]; models: ModelUsage[]; 
+/**
+ * Existing text that was rewritten rather than dictated. Counted apart
+ * from every number above, which all describe dictating.
+ */
+rewrites: number; 
+/**
+ * Of those, the ones steered by a spoken instruction (Command Mode).
+ */
+spoken_commands: number }
 export type WindowsMicrophonePermissionStatus = { supported: boolean; overall_access: PermissionAccess; device_access: PermissionAccess; app_access: PermissionAccess; desktop_app_access: PermissionAccess }
 
 /** tauri-specta globals **/

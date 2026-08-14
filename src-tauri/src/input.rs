@@ -22,6 +22,24 @@ pub fn get_cursor_position(app_handle: &AppHandle) -> Option<(i32, i32)> {
     enigo.location().ok()
 }
 
+/// Tell the system every modifier is up, whatever the keyboard is actually doing.
+///
+/// A hotkey fires while its own keys are held, so anything injected in response
+/// inherits them. Releasing a key the user still holds is safe: the eventual
+/// physical release is simply a second release, which nothing acts on. Not
+/// releasing it means every injected chord silently carries passengers.
+fn release_held_modifiers(enigo: &mut Enigo) {
+    for key in [Key::Control, Key::Alt, Key::Shift, Key::Meta] {
+        // Best effort by design: a platform that rejects one of these should not
+        // stop the others, and the copy afterwards is worth attempting either way.
+        let _ = enigo.key(key, enigo::Direction::Release);
+    }
+
+    // Give the system a moment to process the releases before the next chord —
+    // without it the press can be coalesced with the release it follows.
+    std::thread::sleep(std::time::Duration::from_millis(30));
+}
+
 /// Sends a Ctrl+V or Cmd+V paste command using platform-specific virtual key codes.
 /// This ensures the paste works regardless of keyboard layout (e.g., Russian, AZERTY, DVORAK).
 /// Note: On Wayland, this may not work - callers should check for Wayland and use alternative methods.
@@ -46,6 +64,15 @@ pub fn send_copy(enigo: &mut Enigo, hold_ms: u64) -> Result<(), String> {
     let (modifier_key, c_key_code) = (Key::Control, Key::Other(0x43)); // VK_C
     #[cfg(target_os = "linux")]
     let (modifier_key, c_key_code) = (Key::Control, Key::Unicode('c'));
+
+    // The keys that triggered the hotkey are still physically down. Sending
+    // Ctrl+C on top of a held Ctrl+Alt makes the target application see
+    // Ctrl+Alt+C, which copies nothing — the caller then reports "nothing was
+    // selected" for a selection that was there all along.
+    //
+    // Unlike pasting, which happens seconds later when everything is long
+    // released, reading a selection is the first thing a hotkey does.
+    release_held_modifiers(enigo);
 
     enigo
         .key(modifier_key, enigo::Direction::Press)

@@ -228,6 +228,18 @@ impl HandyKeysState {
 
     /// Register a shortcut binding
     pub fn register(&self, binding: &ShortcutBinding) -> Result<(), String> {
+        // An empty binding is a deliberate "no key for this", not a broken one.
+        // Passing it on produces "Hotkey cannot be empty" on every start, and an
+        // ERROR line that is not an error is worse than no line at all — it is
+        // what makes the real ones easy to scroll past.
+        if binding.current_binding.trim().is_empty() {
+            debug!(
+                "Shortcut '{}' has no key assigned; nothing to register",
+                binding.id
+            );
+            return Ok(());
+        }
+
         let (tx, rx) = mpsc::channel();
         self.command_sender
             .lock()

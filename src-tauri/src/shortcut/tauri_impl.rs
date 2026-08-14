@@ -71,6 +71,17 @@ pub fn validate_shortcut(raw: &str) -> Result<(), String> {
 
 /// Register a shortcut using Tauri's global-shortcut plugin
 pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<(), String> {
+    // An empty binding is a deliberate "no key for this" — see the same guard in
+    // handy_keys.rs. Reporting it as an error puts a false ERROR line in the log
+    // on every start.
+    if binding.current_binding.trim().is_empty() {
+        debug!(
+            "Shortcut '{}' has no key assigned; nothing to register",
+            binding.id
+        );
+        return Ok(());
+    }
+
     // Validate for Tauri requirements
     if let Err(e) = validate_shortcut(&binding.current_binding) {
         warn!(
