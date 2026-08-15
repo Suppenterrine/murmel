@@ -899,6 +899,10 @@ pub fn run(cli_args: CliArgs) {
         .setup(move |app| {
             specta_builder.mount_events(app);
 
+            // Before anything reads settings — including the headless path below.
+            #[cfg(debug_assertions)]
+            portable::seed_dev_settings(app.handle());
+
             // Headless one-shot path (`--transcribe-file` / `--list-devices` /
             // `--list-models`): initialize only what transcription needs — the
             // store/paths plugins, the model + transcription managers, and the

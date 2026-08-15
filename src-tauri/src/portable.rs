@@ -87,6 +87,43 @@ pub fn app_state_dir(app: &tauri::AppHandle) -> Result<PathBuf, tauri::Error> {
     Ok(base)
 }
 
+/// Hand a fresh debug build the installed app's settings to start from, once.
+///
+/// Separating the two protects installed data, but starting every dev run from
+/// factory defaults is its own kind of broken — nobody wants to re-enter their
+/// shortcuts and model choice to test a change. So the first run inherits what
+/// is already there. From then on the two diverge, and nothing a dev build does
+/// can reach back into the installed app's settings.
+///
+/// The history database is deliberately not copied: it is the artifact whose
+/// schema a dev build moves forward, and an empty history costs one dictation
+/// to refill.
+#[cfg(debug_assertions)]
+pub fn seed_dev_settings(app: &tauri::AppHandle) {
+    use crate::settings::SETTINGS_STORE_PATH;
+
+    let (Ok(installed), Ok(dev)) = (app_data_dir(app), app_state_dir(app)) else {
+        return;
+    };
+
+    // Present means either already seeded or since edited — either way, not ours
+    // to overwrite.
+    let target = dev.join(SETTINGS_STORE_PATH);
+    if target.exists() {
+        return;
+    }
+
+    let source = installed.join(SETTINGS_STORE_PATH);
+    if !source.exists() {
+        return;
+    }
+
+    match std::fs::create_dir_all(&dev).and_then(|()| std::fs::copy(&source, &target)) {
+        Ok(_) => eprintln!("[portable] dev settings seeded from {}", source.display()),
+        Err(err) => eprintln!("[portable] could not seed dev settings: {err}"),
+    }
+}
+
 /// Portable-aware replacement for `app.path().app_log_dir()`.
 pub fn app_log_dir(app: &tauri::AppHandle) -> Result<PathBuf, tauri::Error> {
     if let Some(dir) = data_dir() {

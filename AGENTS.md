@@ -151,9 +151,15 @@ Settings are stored using Tauri's store plugin with reactive updates:
 
 `tauri dev` writes its history database and settings store to a `dev/`
 subdirectory of the app data dir (`portable::app_state_dir` / `store_path`).
-**Expect a dev run to start with an empty history and default settings** —
-that is the separation working, not a bug. Models and recordings stay shared,
-so nothing has to be re-downloaded.
+**Expect a dev run to start with an empty history** — that is the separation
+working, not a bug. Models and recordings stay shared, so nothing has to be
+re-downloaded.
+
+Settings are not lost, though: the first dev run copies the installed app's
+`settings_store.json` into `dev/` (`portable::seed_dev_settings`), so shortcuts
+and model choice are there to test with. After that the two diverge. API keys
+are unaffected either way — they live in the OS credential store, not the
+settings file (`secrets.rs`).
 
 The separation exists because database migrations define no `down` step: once a
 dev build migrates `history.db` forward, every older binary is locked out of it.
