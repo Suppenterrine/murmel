@@ -155,6 +155,11 @@ subdirectory of the app data dir (`portable::app_state_dir` / `store_path`).
 working, not a bug. Models and recordings stay shared, so nothing has to be
 re-downloaded.
 
+Debug builds also skip the single-instance plugin, which keys its lock on the
+bundle identifier and would otherwise hand your `tauri dev` arguments to the
+installed app and exit. Testing single-instance behaviour itself therefore needs
+a release build.
+
 Settings are not lost, though: the first dev run copies the installed app's
 `settings_store.json` into `dev/` (`portable::seed_dev_settings`), so shortcuts
 and model choice are there to test with. After that the two diverge. API keys

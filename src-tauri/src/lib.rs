@@ -867,7 +867,16 @@ pub fn run(cli_args: CliArgs) {
     // (--transcribe-file/--list-devices/--list-models) a silent no-op whenever the
     // app is already open, so skip it in headless mode and run a standalone
     // instance instead.
-    if !headless_mode {
+    //
+    // Debug builds skip it as well. The plugin keys its lock on the bundle
+    // identifier, which a dev build shares with the installed app — so starting
+    // `tauri dev` while Murmel is running would hand the arguments to the
+    // installed copy, raise *its* window, and exit before the build you wanted
+    // to test ever ran. The cost is that single-instance behaviour itself
+    // (`--toggle-transcription` and friends) needs a release build to test.
+    let single_instance_wanted = !headless_mode && !cfg!(debug_assertions);
+
+    if single_instance_wanted {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if args.iter().any(|a| a == "--toggle-transcription") {
                 signal_handle::send_transcription_input(app, "transcribe", "CLI");
