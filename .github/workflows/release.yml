@@ -155,6 +155,68 @@ jobs:
 
             core.info(`latest.json covers ${Object.keys(parsed.platforms).length} platform keys.`);
 
+      # Every installer carries its version in the filename, which means the
+      # only link you can hand someone points at one specific release and rots
+      # the moment the next one ships. Sending people to an old release to get
+      # an installer, so the app can then update itself, is how you end up
+      # running a version whose database the current one cannot read.
+      #
+      # A version-free copy fixes that without a second build: it makes
+      #   .../releases/latest/download/Murmel_x64-setup.exe
+      # a permanent address that always serves the newest installer.
+      - name: Add version-free installer aliases
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const releaseId = ${{ needs.create-release.outputs.release-id }};
+            const version = '${{ needs.create-release.outputs.version }}';
+            const { owner, repo } = context.repo;
+
+            // Windows x86_64 is a target platform, so a missing installer is a
+            // failed release; ARM is a bonus and only worth a warning.
+            const aliases = [
+              { source: `Murmel_${version}_x64-setup.exe`, alias: 'Murmel_x64-setup.exe', required: true },
+              { source: `Murmel_${version}_arm64-setup.exe`, alias: 'Murmel_arm64-setup.exe', required: false },
+            ];
+
+            const { data: assets } = await github.rest.repos.listReleaseAssets({
+              owner, repo, release_id: releaseId, per_page: 100,
+            });
+
+            for (const { source, alias, required } of aliases) {
+              const original = assets.find((asset) => asset.name === source);
+              if (!original) {
+                if (required) {
+                  throw new Error(`${source} is missing — there is no installer to link to.`);
+                }
+                core.warning(`${source} is missing; skipping ${alias}.`);
+                continue;
+              }
+
+              // Re-running the workflow over an existing draft would otherwise
+              // collide with the alias uploaded the first time around.
+              const stale = assets.find((asset) => asset.name === alias);
+              if (stale) {
+                await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: stale.id });
+              }
+
+              const { data } = await github.request(
+                'GET /repos/{owner}/{repo}/releases/assets/{asset_id}',
+                { owner, repo, asset_id: original.id, headers: { accept: 'application/octet-stream' } },
+              );
+
+              await github.rest.repos.uploadReleaseAsset({
+                owner, repo, release_id: releaseId, name: alias,
+                data: Buffer.from(data),
+                headers: {
+                  'content-type': 'application/octet-stream',
+                  'content-length': data.byteLength,
+                },
+              });
+
+              core.info(`${alias} now mirrors ${source}.`);
+            }
+
       - name: Publish the release
         uses: actions/github-script@v9
         with:
