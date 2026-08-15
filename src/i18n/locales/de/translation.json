@@ -294,6 +294,7 @@
         "output": "Ausgabe",
         "transcription": "Transkription",
         "history": "Verlauf",
+        "backup": "Sicherung",
         "experimental": "Experimentell"
       },
       "experimentalToggle": {
@@ -580,6 +581,18 @@
       },
       "clearTitle": "Statistik zurücksetzen",
       "clearConfirm": "Alle Nutzungszahlen löschen? Der Verlauf mit deinen Transkripten bleibt erhalten. Das lässt sich nicht rückgängig machen."
+    },
+    "backup": {
+      "title": "Einstellungen sichern",
+      "description": "Murmel legt bei jedem Start eine Kopie deiner Einstellungen an, und du kannst eine speichern, wo du magst. API-Schlüssel sind nie Teil einer Sicherung — sie bleiben im Anmeldeinformations-Speicher deines Systems.",
+      "export": "In Datei sichern",
+      "import": "Aus Datei wiederherstellen",
+      "automatic": "Automatische Sicherungen",
+      "none": "Noch keine Sicherungen. Die erste entsteht, sobald sich deine Einstellungen ändern.",
+      "restore": "Wiederherstellen",
+      "exported": "Einstellungen gesichert.",
+      "restored": "Einstellungen wiederhergestellt.",
+      "missingModel": "Einstellungen wiederhergestellt. Das darin gewählte Modell ({{model}}) ist auf diesem Rechner nicht vorhanden — du kannst es unter Modelle herunterladen."
     },
     "history": {
       "title": "Verlauf",

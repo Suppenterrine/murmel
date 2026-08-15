@@ -294,6 +294,7 @@
         "output": "Output",
         "transcription": "Transcription",
         "history": "History",
+        "backup": "Backup",
         "experimental": "Experimental"
       },
       "experimentalToggle": {
@@ -580,6 +581,18 @@
       },
       "clearTitle": "Reset statistics",
       "clearConfirm": "Delete all usage figures? Your history with the transcripts is kept. This cannot be undone."
+    },
+    "backup": {
+      "title": "Settings backup",
+      "description": "Murmel keeps a copy of your settings at every start, and you can save one wherever you like. API keys are never part of a backup — they stay in your system's credential store.",
+      "export": "Save to file",
+      "import": "Restore from file",
+      "automatic": "Automatic backups",
+      "none": "No backups yet. The first one is taken the next time your settings change.",
+      "restore": "Restore",
+      "exported": "Settings saved.",
+      "restored": "Settings restored.",
+      "missingModel": "Settings restored. The model they ask for ({{model}}) is not on this machine — you can download it under Models."
     },
     "history": {
       "title": "History",

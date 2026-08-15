@@ -410,6 +410,44 @@ async clearUsageStats() : Promise<Result<null, string>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * The automatic backups taken at startup, newest first.
+ */
+async listSettingsBackups() : Promise<Result<SettingsBackup[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_settings_backups") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async restoreSettingsBackup(name: string) : Promise<Result<RestoreReport, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("restore_settings_backup", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * The current settings as a file the user can keep. Never includes API keys.
+ */
+async exportSettings() : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("export_settings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async importSettings(json: string) : Promise<Result<RestoreReport, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("import_settings", { json }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async addPostProcessPrompt(name: string, prompt: string) : Promise<Result<LLMPrompt, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("add_post_process_prompt", { name, prompt }) };
@@ -1372,6 +1410,17 @@ export type RemoteModel = { id: string; name: string; context_length: number;
  * because only it knows how long the user's dictations actually are.
  */
 prompt_price: number; completion_price: number; is_free: boolean }
+/**
+ * What the user needs to know after settings came back.
+ */
+export type RestoreReport = {
+/**
+ * The transcription model the restored settings ask for, when it is not on
+ * disk. The UI offers to fetch it; nothing downloads on its own — a
+ * restore should never start a multi-gigabyte transfer behind the user's
+ * back.
+ */
+missing_model: string | null }
 export type SecretMap = Partial<{ [key in string]: string }>
 export type SecureInputStatus = { 
 /**
@@ -1405,6 +1454,19 @@ uncovered_bindings: string[];
  * warning banner appears and explains why recording refused.
  */
 recorder_blocked: boolean }
+/**
+ * One automatic backup, for the restore list.
+ */
+export type SettingsBackup = {
+/**
+ * File name, and the handle `restore` takes. Never a path — a caller must
+ * not be able to reach outside the backup directory.
+ */
+name: string;
+/**
+ * When it was taken, formatted for display in the local timezone.
+ */
+taken_at: string }
 export type ShortcutBinding = { id: string; name: string; description: string; default_binding: string; current_binding: string }
 export type SoundTheme = "marimba" | "pop" | "custom"
 /**

@@ -22,6 +22,7 @@ mod problem;
 mod secrets;
 mod secure_input;
 mod settings;
+mod settings_backup;
 mod shortcut;
 mod signal_handle;
 mod transcription_coordinator;
@@ -699,6 +700,10 @@ pub fn run(cli_args: CliArgs) {
             commands::history::get_usage_summary,
             commands::history::export_usage_stats,
             commands::history::clear_usage_stats,
+            commands::settings_backup::list_settings_backups,
+            commands::settings_backup::restore_settings_backup,
+            commands::settings_backup::export_settings,
+            commands::settings_backup::import_settings,
             shortcut::add_post_process_prompt,
             shortcut::update_post_process_prompt,
             shortcut::delete_post_process_prompt,
@@ -911,6 +916,10 @@ pub fn run(cli_args: CliArgs) {
             // Before anything reads settings — including the headless path below.
             #[cfg(debug_assertions)]
             portable::seed_dev_settings(app.handle());
+
+            // ...and before anything writes them, so the copy is of the state
+            // the user last left behind, not of whatever this launch migrates.
+            settings_backup::rotate_on_start(app.handle());
 
             // Headless one-shot path (`--transcribe-file` / `--list-devices` /
             // `--list-models`): initialize only what transcription needs — the
