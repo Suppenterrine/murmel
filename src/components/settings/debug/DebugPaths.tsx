@@ -43,9 +43,12 @@ export const DebugPaths: React.FC<DebugPathsProps> = ({
           <span className="font-medium">
             {t("settings.debug.paths.settings")}
           </span>{" "}
-          {/* eslint-disable-next-line i18next/no-literal-string */}
+          {/* Debug builds keep their own store so a dev run cannot migrate the
+              installed app's settings forward; see portable.rs. */}
           <span className="font-mono text-xs select-text">
-            %APPDATA%/murmel/settings_store.json
+            {import.meta.env.DEV
+              ? "%APPDATA%/murmel/dev/settings_store.json"
+              : "%APPDATA%/murmel/settings_store.json"}
           </span>
         </div>
       </div>

@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local, Utc};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use rusqlite::{params, Connection, OptionalExtension};
 use rusqlite_migration::{Migrations, M};
 use serde::{Deserialize, Serialize};
@@ -462,39 +462,81 @@ impl HistoryEntry {
     }
 }
 
+/// Refuse a database whose schema is newer than this build knows about.
+///
+/// This is not damage that can be repaired: the migrations define no `down`
+/// step, so schema changes made by a newer build cannot be undone. Checking it
+/// before running migrations — rather than letting the migration library return
+/// a bare `DatabaseTooFarAhead` — is what lets the message name both versions
+/// and reassure the user that their data is still there.
+fn ensure_schema_is_readable(db_schema_version: i32, known_migrations: usize) -> Result<()> {
+    if db_schema_version as usize > known_migrations {
+        return Err(anyhow!(
+            "This history database was created by a newer version of Murmel \
+             (database schema {db_schema_version}, this build understands up to \
+             {known_migrations}). Nothing was lost — install the newer version to \
+             use your history again."
+        ));
+    }
+
+    Ok(())
+}
+
 pub struct HistoryManager {
     app_handle: AppHandle,
     recordings_dir: PathBuf,
     db_path: PathBuf,
+    /// `Some(reason)` when the database could not be prepared for use.
+    ///
+    /// History is not what makes Murmel useful — dictation is. A database we
+    /// cannot open must therefore never keep the app from starting, so the
+    /// reason is carried here and returned from every database call instead.
+    unavailable: Option<String>,
 }
 
 impl HistoryManager {
     pub fn new(app_handle: &AppHandle) -> Result<Self> {
-        // Create recordings directory in app data dir
+        // Recordings are plain audio files with no schema, so they stay in the
+        // shared data dir. Only the database follows the per-build state dir.
         let app_data_dir = crate::portable::app_data_dir(app_handle)?;
         let recordings_dir = app_data_dir.join("recordings");
-        let db_path = app_data_dir.join("history.db");
 
-        // Ensure recordings directory exists
-        if !recordings_dir.exists() {
-            fs::create_dir_all(&recordings_dir)?;
-            debug!("Created recordings directory: {:?}", recordings_dir);
+        let state_dir = crate::portable::app_state_dir(app_handle)?;
+        let db_path = state_dir.join("history.db");
+
+        // Recordings are independent of the database, so a folder we cannot
+        // create is worth a warning, not a dead app.
+        if let Err(err) = fs::create_dir_all(&recordings_dir) {
+            warn!("Could not create recordings directory {recordings_dir:?}: {err}");
         }
 
-        let manager = Self {
+        let mut manager = Self {
             app_handle: app_handle.clone(),
             recordings_dir,
             db_path,
+            unavailable: None,
         };
 
-        // Initialize database and run migrations synchronously
-        manager.init_database()?;
+        // Initialize database and run migrations synchronously. A failure here
+        // used to panic during setup, which killed the process before the tray
+        // icon or any window existed — the app simply did not start, with no
+        // error anywhere the user could see it.
+        if let Err(err) = manager.init_database() {
+            error!("History database unavailable: {err:#}");
+            manager.unavailable = Some(err.to_string());
+        }
 
         Ok(manager)
     }
 
     fn init_database(&self) -> Result<()> {
         info!("Initializing database at {:?}", self.db_path);
+
+        // `Connection::open` creates the file but not its parent directory,
+        // which does not exist yet on the first run of a debug build.
+        if let Some(parent) = self.db_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
 
         let mut conn = Connection::open(&self.db_path)?;
 
@@ -513,6 +555,8 @@ impl HistoryManager {
         let version_before: i32 =
             conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
         debug!("Database version before migration: {}", version_before);
+
+        ensure_schema_is_readable(version_before, MIGRATIONS.len())?;
 
         // Apply any pending migrations
         migrations.to_latest(&mut conn)?;
@@ -590,6 +634,12 @@ impl HistoryManager {
     }
 
     fn get_connection(&self) -> Result<Connection> {
+        // Every database operation funnels through here, so this single guard
+        // turns "unusable database" into an explanation at each call site.
+        if let Some(reason) = &self.unavailable {
+            return Err(anyhow!("{reason}"));
+        }
+
         let conn = Connection::open(&self.db_path)?;
         Self::apply_pragmas(&conn)?;
         Ok(conn)
@@ -1644,6 +1694,31 @@ mod tests {
             ],
         )
         .expect("insert usage stats");
+    }
+
+    /// The failure this guards against cost a working installation: a database
+    /// migrated by a newer build made every older binary panic during setup,
+    /// before a window or tray icon existed. The app looked like it did nothing
+    /// at all when started, with no error anywhere the user could find one.
+    #[test]
+    fn a_database_from_a_newer_build_is_refused_by_name() {
+        let err = ensure_schema_is_readable(13, 12)
+            .expect_err("a schema newer than this build must be refused")
+            .to_string();
+
+        assert!(err.contains("13"), "must name the database schema: {err}");
+        assert!(err.contains("12"), "must name what this build knows: {err}");
+    }
+
+    #[test]
+    fn a_database_this_build_can_migrate_is_accepted() {
+        // Equal: already current. Lower: pending migrations. Zero: brand new.
+        for version in [0, 5, 12] {
+            assert!(
+                ensure_schema_is_readable(version, 12).is_ok(),
+                "schema {version} is within reach of 12 migrations"
+            );
+        }
     }
 
     #[test]

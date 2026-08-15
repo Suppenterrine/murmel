@@ -65,6 +65,28 @@ pub fn app_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, tauri::Error> {
     }
 }
 
+/// Subdirectory holding the state that carries a schema version. Debug builds
+/// keep their own copy so a `tauri dev` run cannot migrate the installed app's
+/// data forward: migrations have no `down` step, so a database touched by a
+/// newer build is unreadable for every older binary — which is exactly how an
+/// installed Murmel once stopped starting altogether.
+#[cfg(debug_assertions)]
+const DEV_STATE_SUBDIR: &str = "dev";
+
+/// Directory for version-bearing state (history database, settings store).
+///
+/// Release builds use the app data dir unchanged. Debug builds get a `dev/`
+/// subdirectory, so models and recordings — which have no schema and cost
+/// gigabytes to re-download — stay shared while the fragile parts stay apart.
+pub fn app_state_dir(app: &tauri::AppHandle) -> Result<PathBuf, tauri::Error> {
+    let base = app_data_dir(app)?;
+
+    #[cfg(debug_assertions)]
+    let base = base.join(DEV_STATE_SUBDIR);
+
+    Ok(base)
+}
+
 /// Portable-aware replacement for `app.path().app_log_dir()`.
 pub fn app_log_dir(app: &tauri::AppHandle) -> Result<PathBuf, tauri::Error> {
     if let Some(dir) = data_dir() {
@@ -82,12 +104,18 @@ pub fn resolve_app_data(app: &tauri::AppHandle, relative: &str) -> Result<PathBu
 
 /// Get the path to use with `tauri-plugin-store`.
 /// Returns an absolute path in portable mode (so the store plugin writes to
-/// the portable Data dir) or the original relative path otherwise.
+/// the portable Data dir) or a path relative to the app data dir otherwise.
+/// Debug builds are prefixed into the `dev/` subdirectory; see [`app_state_dir`].
 pub fn store_path(relative: &str) -> PathBuf {
+    #[cfg(debug_assertions)]
+    let relative = PathBuf::from(DEV_STATE_SUBDIR).join(relative);
+    #[cfg(not(debug_assertions))]
+    let relative = PathBuf::from(relative);
+
     if let Some(dir) = data_dir() {
         dir.join(relative)
     } else {
-        PathBuf::from(relative)
+        relative
     }
 }
 

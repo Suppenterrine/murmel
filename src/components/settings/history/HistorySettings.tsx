@@ -76,6 +76,9 @@ export const HistorySettings: React.FC = () => {
   const osType = useOsType();
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  // Why the list is empty, when it is empty for a reason. Without this, a
+  // database the backend cannot open looks exactly like "no dictations yet".
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [search, setSearch] = useState("");
   const [onlySaved, setOnlySaved] = useState(false);
@@ -113,9 +116,16 @@ export const HistorySettings: React.FC = () => {
           isFirstPage ? newEntries : [...prev, ...newEntries],
         );
         setHasMore(has_more);
+        setLoadError(null);
+      } else {
+        console.error("Failed to load history entries:", result.error);
+        setLoadError(String(result.error));
+        setHasMore(false);
       }
     } catch (error) {
       console.error("Failed to load history entries:", error);
+      setLoadError(String(error));
+      setHasMore(false);
     } finally {
       setLoading(false);
       loadingRef.current = false;
@@ -149,9 +159,15 @@ export const HistorySettings: React.FC = () => {
           setEntries(result.data);
           // A search returns its whole result at once — nothing left to page.
           setHasMore(false);
+          setLoadError(null);
+        } else {
+          console.error("Failed to search history entries:", result.error);
+          setLoadError(String(result.error));
+          setHasMore(false);
         }
       } catch (error) {
         console.error("Failed to search history entries:", error);
+        if (!cancelled) setLoadError(String(error));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -293,7 +309,18 @@ export const HistorySettings: React.FC = () => {
 
   let content: React.ReactNode;
 
-  if (loading) {
+  if (loadError) {
+    // Shown in place of the list: an unreadable database is the answer to
+    // "where is my history", so it belongs where the history would have been.
+    content = (
+      <div className="px-4 py-3 space-y-1">
+        <p className="text-sm font-medium text-red-500">
+          {t("settings.history.unavailable")}
+        </p>
+        <p className="text-xs text-text/60 break-words">{loadError}</p>
+      </div>
+    );
+  } else if (loading) {
     content = (
       <div className="px-4 py-3 text-center text-text/60">
         {t("settings.history.loading")}

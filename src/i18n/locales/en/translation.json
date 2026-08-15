@@ -586,6 +586,7 @@
       "openFolder": "Open Recordings Folder",
       "loading": "Loading history...",
       "empty": "No transcriptions yet. Start recording to build your history!",
+      "unavailable": "Your history could not be opened.",
       "metrics": {
         "duration": "{{seconds}}s spoken",
         "wpm": "{{wpm}} words/min",

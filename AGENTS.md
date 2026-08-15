@@ -147,6 +147,21 @@ Settings are stored using Tauri's store plugin with reactive updates:
 - Model preferences (Small/Medium/Turbo/Large Whisper variants)
 - Audio feedback and translation options
 
+### Debug builds keep their own state
+
+`tauri dev` writes its history database and settings store to a `dev/`
+subdirectory of the app data dir (`portable::app_state_dir` / `store_path`).
+**Expect a dev run to start with an empty history and default settings** —
+that is the separation working, not a bug. Models and recordings stay shared,
+so nothing has to be re-downloaded.
+
+The separation exists because database migrations define no `down` step: once a
+dev build migrates `history.db` forward, every older binary is locked out of it.
+That happened — an installed release stopped starting at all, because the
+failure panicked during setup before a tray icon or window existed. The panic is
+gone too (`HistoryManager` now carries the reason and reports it in the UI), but
+a dev run should not be able to touch installed data in the first place.
+
 ### Single Instance Architecture
 
 The app enforces single instance behavior — launching when already running brings the settings window to front rather than creating a new process. Remote control flags (`--toggle-transcription`, etc.) work by launching a second instance that sends args to the running instance via `tauri_plugin_single_instance`, then exits.
