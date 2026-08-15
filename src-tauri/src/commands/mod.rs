@@ -31,6 +31,30 @@ pub fn is_portable() -> bool {
     crate::portable::is_portable()
 }
 
+/// Write a file the user picked in a save dialog.
+///
+/// The frontend cannot do this itself: the `fs` plugin's scope is limited to
+/// `$APPDATA`, so every export written straight from TypeScript failed silently
+/// wherever a user would actually want to put it. Widening that scope would
+/// mean naming a fixed set of blessed folders and telling people to save there.
+///
+/// The path is one the user chose in a native dialog a moment earlier, and the
+/// only caller is our own frontend, so this is not a wider hole than the save
+/// dialog itself.
+#[tauri::command]
+#[specta::specta]
+pub fn write_chosen_file(path: String, contents: String) -> Result<(), String> {
+    std::fs::write(&path, contents).map_err(|e| format!("{path}: {e}"))
+}
+
+/// Read a file the user picked in an open dialog. Counterpart to
+/// [`write_chosen_file`], and limited the same way for the same reasons.
+#[tauri::command]
+#[specta::specta]
+pub fn read_chosen_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_app_dir_path(app: AppHandle) -> Result<String, String> {

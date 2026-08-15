@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
 import { commands, type RestoreReport, type SettingsBackup } from "@/bindings";
 import { SettingContainer } from "../../ui/SettingContainer";
@@ -64,7 +63,14 @@ export const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
       });
       if (!path) return;
 
-      await writeTextFile(path, result.data);
+      // Written by the backend: the fs plugin's scope stops at $APPDATA, so
+      // writing from here would fail silently wherever the user picked.
+      const written = await commands.writeChosenFile(path, result.data);
+      if (written.status !== "ok") {
+        toast.error(written.error);
+        return;
+      }
+
       toast.success(t("settings.backup.exported"));
     } catch (error) {
       toast.error(String(error));
@@ -82,7 +88,13 @@ export const SettingsBackupSection: React.FC<SettingsBackupSectionProps> = ({
       });
       if (!path || Array.isArray(path)) return;
 
-      const result = await commands.importSettings(await readTextFile(path));
+      const file = await commands.readChosenFile(path);
+      if (file.status !== "ok") {
+        toast.error(file.error);
+        return;
+      }
+
+      const result = await commands.importSettings(file.data);
       if (result.status !== "ok") {
         toast.error(result.error);
         return;

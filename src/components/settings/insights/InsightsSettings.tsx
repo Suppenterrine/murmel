@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { save } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { ask } from "@tauri-apps/plugin-dialog";
+import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { commands, type UsageSummary } from "@/bindings";
 import { SettingsGroup } from "../../ui/SettingsGroup";
@@ -67,8 +67,15 @@ export const InsightsSettings: React.FC = () => {
       });
       if (!path) return;
 
+      // Written by the backend: the fs plugin's scope stops at $APPDATA, so
+      // this used to fail silently wherever anyone would actually save it.
+      const write = async (contents: string) => {
+        const written = await commands.writeChosenFile(path, contents);
+        if (written.status !== "ok") throw new Error(written.error);
+      };
+
       if (format === "json") {
-        await writeTextFile(path, JSON.stringify(rows, null, 2));
+        await write(JSON.stringify(rows, null, 2));
       } else {
         const columns = Object.keys(rows[0] ?? { timestamp: 0 });
         const escape = (value: unknown) => {
@@ -84,10 +91,12 @@ export const InsightsSettings: React.FC = () => {
               .join(","),
           ),
         ];
-        await writeTextFile(path, lines.join("\n"));
+        await write(lines.join("\n"));
       }
     } catch (error) {
+      // A silent console.error is why nobody noticed this never wrote a file.
       console.error("Failed to export statistics:", error);
+      toast.error(String(error));
     } finally {
       setBusy(false);
     }

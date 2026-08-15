@@ -737,6 +737,8 @@ pub fn run(cli_args: CliArgs) {
             commands::cancel_operation,
             commands::dismiss_overlay_problem,
             commands::is_portable,
+            commands::write_chosen_file,
+            commands::read_chosen_file,
             commands::get_app_dir_path,
             commands::get_app_settings,
             commands::get_default_settings,
