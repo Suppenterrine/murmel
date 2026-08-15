@@ -9,13 +9,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # macOS is absent for the same reason it is absent from release.yml: it
+        # is not a target platform (Murmel_Northstar.md §3), and the build
+        # cannot succeed anyway while APPLE_CERTIFICATE is set to an empty
+        # string. Leaving it in made every test build report failure, which is
+        # the surest way to stop reading the result at all.
         include:
-          - platform: "macos-26" # for Arm based macs (M1 and above). Uses macOS 26 for Apple Intelligence SDK.
-            args: "--target aarch64-apple-darwin"
-            target: "aarch64-apple-darwin"
-          - platform: "macos-latest" # for Intel based macs.
-            args: "--target x86_64-apple-darwin"
-            target: "x86_64-apple-darwin"
           - platform: "ubuntu-22.04" # Build .deb on 22.04
             args: "--bundles deb"
             target: "x86_64-unknown-linux-gnu"
