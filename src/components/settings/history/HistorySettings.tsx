@@ -20,7 +20,9 @@ import {
   type EntryKind,
   type HistoryEntry,
   type HistoryUpdatePayload,
+  type ModelInfo,
 } from "@/bindings";
+import { useModelStore } from "@/stores/modelStore";
 import { useOsType } from "@/hooks/useOsType";
 import { formatDateTime } from "@/utils/dateFormat";
 import { AudioPlayer, AudioPlayerGroup } from "../../ui/AudioPlayer";
@@ -767,6 +769,26 @@ const TranscriptCorrection: React.FC<{ id: number; text: string }> = ({
 };
 
 /**
+ * A model's name the way a person would say it.
+ *
+ * `model_used` stores the technical id, which for a downloaded model is a
+ * Hugging Face repo path plus file name — correct, and far too long to sit
+ * under a dictation. The catalogue knows a readable name for everything it
+ * offers; for a model that is no longer installed, the bare file name still
+ * says more than the full path.
+ */
+const modelLabel = (
+  id: string,
+  lookup: (id: string) => ModelInfo | undefined,
+): string =>
+  lookup(id)?.name ??
+  id
+    .split("/")
+    .pop()
+    ?.replace(/\.(gguf|bin)$/, "") ??
+  id;
+
+/**
  * The numbers behind one dictation: how fast it was spoken, how long the model
  * took, and what happened during refinement.
  *
@@ -775,6 +797,7 @@ const TranscriptCorrection: React.FC<{ id: number; text: string }> = ({
  */
 const EntryMetrics: React.FC<{ entry: HistoryEntry }> = ({ entry }) => {
   const { t } = useTranslation();
+  const getModelInfo = useModelStore((state) => state.getModelInfo);
 
   const parts: string[] = [];
 
@@ -801,7 +824,7 @@ const EntryMetrics: React.FC<{ entry: HistoryEntry }> = ({ entry }) => {
     );
   }
 
-  if (entry.model_used) parts.push(entry.model_used);
+  if (entry.model_used) parts.push(modelLabel(entry.model_used, getModelInfo));
 
   if (parts.length === 0) return null;
 
